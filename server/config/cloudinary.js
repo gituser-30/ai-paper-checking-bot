@@ -1,7 +1,13 @@
+// We check the environment variable BEFORE requiring the library 
+// to prevent the library from crashing on a malformed URL.
+if (process.env.CLOUDINARY_URL && !process.env.CLOUDINARY_URL.startsWith('cloudinary://')) {
+  console.warn('Removing malformed CLOUDINARY_URL to prevent library crash.');
+  delete process.env.CLOUDINARY_URL;
+}
+
 const cloudinary = require('cloudinary').v2;
 
-// If CLOUDINARY_URL is present, the library uses it automatically.
-// Otherwise, we configure it using individual environment variables.
+// Configure using individual keys if URL is missing
 if (!process.env.CLOUDINARY_URL) {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
