@@ -17,10 +17,7 @@ services:
       - key: CLOUDINARY_URL
         sync: false
       - key: AI_SERVICE_URL
-        fromService:
-          type: web
-          name: ai-service
-          property: host
+        value: http://ai-service:8000 # Internal Render URL with port
 
   # 2. Python AI Service
   - type: web
@@ -29,7 +26,7 @@ services:
     rootDir: ai_service
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
     envVars:
       - key: GROQ_API_KEY
         sync: false
@@ -38,6 +35,7 @@ services:
   - type: web
     name: ai-paper-client
     env: static
+    plan: free
     rootDir: client
     buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: dist
