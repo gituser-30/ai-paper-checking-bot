@@ -1,0 +1,49 @@
+services:
+  # 1. Node.js Backend
+  - type: web
+    name: ai-paper-server
+    env: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: ai-service
+          property: host
+
+  # 2. Python AI Service
+  - type: web
+    name: ai-service
+    env: python
+    rootDir: ai_service
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+
+  # 3. Frontend Static Site
+  - type: static
+    name: ai-paper-client
+    env: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: ai-paper-server
+          property: host

@@ -56,7 +56,7 @@ const Generate = () => {
   const handleGenerate = async () => {
     if (selectedMaterials.length === 0) return;
     setLoading(true);
-    
+
     // Combine text from all selected materials
     const selectedData = materials.filter(m => selectedMaterials.includes(m._id));
     const combinedText = selectedData.map(m => m.extractedText).join("\n\n---\n\n");
@@ -138,15 +138,15 @@ const Generate = () => {
           <h4 className="fw-bold mb-4 d-flex align-items-center"><Settings className="me-2 text-primary" /> Configure Requirements</h4>
           <div className="mb-4">
             <label className="form-label text-secondary small fw-bold text-uppercase">Select Study Materials (Multi-select)</label>
-            <div className="bg-glass rounded-4 p-3 border border-secondary border-opacity-25" style={{maxHeight: '200px', overflowY: 'auto'}}>
+            <div className="bg-glass rounded-4 p-3 border border-secondary border-opacity-25" style={{ maxHeight: '200px', overflowY: 'auto' }}>
               {materials.length === 0 ? (
                 <p className="small text-secondary mb-0">No processed materials found. Upload some first!</p>
               ) : (
                 materials.map(m => (
                   <div key={m._id} className="form-check mb-2">
-                    <input 
-                      className="form-check-input" 
-                      type="checkbox" 
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
                       id={m._id}
                       checked={selectedMaterials.includes(m._id)}
                       onChange={(e) => {
@@ -259,6 +259,7 @@ const Generate = () => {
                   <div className="row g-2 ms-4">
                     {q.options.map((opt, idx) => (
                       <div key={idx} className="col-6 mb-1">{String.fromCharCode(65 + idx)}) {opt}</div>
+
                     ))}
                   </div>
                 )}
@@ -267,7 +268,7 @@ const Generate = () => {
                   <div className="mt-3 p-3 border border-dark rounded bg-light text-dark">
                     <span className="fw-bold me-2">
                       {q.questionType === 'mcq' ? 'Correct Answer:' : 'Model Answer (Professor Logic):'}
-                    </span> 
+                    </span>
                     <div className={q.questionType === 'theory' ? 'mt-2 border-top border-secondary border-opacity-25 pt-2' : 'd-inline'}>
                       {q.correctAnswer}
                     </div>
