@@ -106,6 +106,10 @@ async def extract_text_url(request: dict):
 
 @app.post("/generate-paper")
 async def generate_paper(request: PaperGenerationRequest):
+    print(f"--- GENERATION START ---")
+    print(f"Material Length: {len(request.material_text)} chars")
+    print(f"Config: {request.mcq_count} MCQs, {request.theory_count} Theory, Difficulty: {request.difficulty}")
+    
     prompt = f"""
     You are an Expert University Professor and Subject Matter Expert. 
     Your task is to generate a high-quality, academically rigorous question paper based ONLY on the core educational content provided.
@@ -148,14 +152,16 @@ async def generate_paper(request: PaperGenerationRequest):
     """
     
     try:
+        print("Calling Groq API...")
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
+        print("Generation Successful!")
         return completion.choices[0].message.content
     except Exception as e:
-        print(f"GENERATION ERROR: {str(e)}")
+        print(f"!!! GENERATION ERROR !!!: {str(e)}")
         # If it's a context length issue, try with a smaller chunk as fallback
         if any(msg in str(e).lower() for msg in ["rate_limit", "context_length", "limit_reached"]):
             print("Fallback to smaller context...")

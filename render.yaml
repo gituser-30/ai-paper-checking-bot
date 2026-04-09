@@ -16,8 +16,10 @@ services:
         sync: false
       - key: CLOUDINARY_URL
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: AI_SERVICE_URL
-        value: http://ai-service:8000 # Internal Render URL with port
+        value: http://ai-service:8000 # Using fixed port for internal networking
 
   # 2. Python AI Service
   - type: web
@@ -30,6 +32,8 @@ services:
     envVars:
       - key: GROQ_API_KEY
         sync: false
+      - key: PORT
+        value: 8000 # Force Render to use 8000 internally
 
   # 3. Frontend Static Site
   - type: web
@@ -46,3 +50,5 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://ai-paper-server.onrender.com/api
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false

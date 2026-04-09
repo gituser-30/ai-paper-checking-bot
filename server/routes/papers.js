@@ -16,6 +16,8 @@ router.post('/generate', async (req, res) => {
             total_marks: config.totalMarks,
             mcq_count: config.mcqCount || 0,
             theory_count: config.theoryCount || 0
+        }, {
+            timeout: 60000 // 60s timeout for large generation
         });
 
         // AI returns a JSON string, extract questions
