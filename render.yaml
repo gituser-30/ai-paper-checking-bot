@@ -41,6 +41,9 @@ services:
     rootDir: client
     buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: dist
+    headers:
+      - key: Cross-Origin-Opener-Policy
+        value: same-origin-allow-popups
     envVars:
       - key: VITE_API_URL
         fromService:
