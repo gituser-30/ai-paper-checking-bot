@@ -35,12 +35,13 @@ services:
         sync: false
 
   # 3. Frontend Static Site
-  - type: static
+  - type: web
     name: ai-paper-client
     env: static
+    plan: free
     rootDir: client
     buildCommand: npm install && npm run build
-    publishDir: dist
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
         fromService:
