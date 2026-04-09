@@ -47,7 +47,4 @@ services:
         value: same-origin-allow-popups
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: ai-paper-server
-          property: host
+        value: https://ai-paper-server.onrender.com/api
