@@ -1,6 +1,6 @@
-# AI-Powered Paper Generation & Evaluation System
+# EvalyzeAI
 
-A modern MERN application for professors and educators to generate high-quality, concept-driven exam papers using AI, with support for handwritten notes and multi-material synthesis.
+EvalyzeAI is a high-performance MERN + Python platform designed for modern academic evaluation. It allows professors and educators to generate high-quality, concept-driven exam papers using AI, with support for handwritten notes and multi-material synthesis.
 
 ## 🚀 Key Features
 

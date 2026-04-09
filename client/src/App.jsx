@@ -82,7 +82,7 @@ const Navbar = () => {
 
         {/* Logo */}
         <Link className="navbar-brand fw-bold fs-3 gradient-text" to="/">
-          AI Examiner
+          EvalyzeAI
         </Link>
 
         {/* Toggle */}

@@ -23,7 +23,7 @@ const Landing = () => {
         <div className="col-lg-6 mb-5 mb-lg-0">
           <h1 className="display-2 fw-bold mb-4">
             Next-Gen <br />
-            <span className="gradient-text">AI Examiner</span>
+            <span className="gradient-text">EvalyzeAI</span>
           </h1>
           <p className="lead mb-5 text-secondary pe-lg-5">
             The ultimate platform for automated paper generation and handwritten answer checking. 
