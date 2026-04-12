@@ -155,7 +155,7 @@ async def extract_text_url(request: dict):
                     res = await loop.run_in_executor(
                         None, 
                         lambda: client.chat.completions.create(
-                            model="meta-llama/llama-4-scout-17b-16e-instruct",
+                            model="llama-3.2-90b-vision-preview",
                             messages=[{"role": "user", "content": content_list}],
                         )
                     )
@@ -175,7 +175,7 @@ async def extract_text_url(request: dict):
             # Image file: Vision OCR directly
             encoded_image = base64.b64encode(content).decode("utf-8")
             res = client.chat.completions.create(
-                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                model="llama-3.2-90b-vision-preview",
                 messages=[
                     {
                         "role": "user",
@@ -427,7 +427,7 @@ Note: no obtainedMarks value may exceed the question's Max Marks.
     try:
         print(f"Calling Groq Vision with {len(content) - 1} image(s)...")
         completion = client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            model="llama-3.2-90b-vision-preview",
             messages=[{"role": "user", "content": content}],
             response_format={"type": "json_object"},
             temperature=0.2,
@@ -525,7 +525,7 @@ Rules:
     try:
         print("Step 1: Extracting questions from question paper via Vision OCR...")
         qp_completion = client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            model="llama-3.2-90b-vision-preview",
             messages=[{"role": "user", "content": qp_content}],
             response_format={"type": "json_object"},
             temperature=0.1,   # Very low — we want exact extraction, not creativity
@@ -617,7 +617,7 @@ Note: totalScore must equal the sum of all obtainedMarks. No obtainedMarks may e
     try:
         print("Step 2: Evaluating answer sheet against extracted questions...")
         eval_completion = client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            model="llama-3.2-90b-vision-preview",
             messages=[{"role": "user", "content": ans_content}],
             response_format={"type": "json_object"},
             temperature=0.2,
