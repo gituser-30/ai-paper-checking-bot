@@ -282,7 +282,7 @@ Return ONLY a valid JSON object in this exact format:
 }}
 
 === STUDY MATERIAL ===
-{request.material_text[:35000]}
+{request.material_text[:22000]}
 """
 
     try:
