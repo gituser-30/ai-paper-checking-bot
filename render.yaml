@@ -19,7 +19,7 @@ services:
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: AI_SERVICE_URL
-        value: http://ai-service:8000 # Using fixed port for internal networking
+        value: https://ai-paper-ai-service.onrender.com  # Using public URL for better reliability
 
   # 2. Python AI Service
   - type: web
@@ -28,12 +28,10 @@ services:
     rootDir: ai_service
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GROQ_API_KEY
         sync: false
-      - key: PORT
-        value: 8000 # Force Render to use 8000 internally
 
   # 3. Frontend Static Site
   - type: static
@@ -46,10 +44,6 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
-    headers:
-      - path: /*
-        name: Cross-Origin-Opener-Policy
-        value: same-origin-allow-popups
     envVars:
       - key: VITE_API_URL
         value: https://ai-paper-server.onrender.com/api
