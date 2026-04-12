@@ -12,65 +12,7 @@ import Generate from './pages/Generate';
 import History from './pages/History';
 import Checker from './pages/Checker';
 
-// const Navbar = () => {
-//   const { theme, toggleTheme } = useTheme();
-//   const { user, logout } = useAuth();
 
-//   return (
-//     <nav className="navbar navbar-expand-lg glass-card m-3 px-4 py-2 sticky-top">
-//       <div className="container-fluid">
-//         <Link className="navbar-brand fw-bold gradient-text fs-3" to="/">AI Examiner</Link>
-//         <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-//           <span className="navbar-toggler-icon text-white"></span>
-//         </button>
-//         <div className="collapse navbar-collapse" id="navbarNav">
-//           <ul className="navbar-nav ms-auto align-items-center">
-//             {user ? (
-//               <>
-//                 <li className="nav-item">
-//                   <Link className="nav-link mx-2 text-white" to="/dashboard"><LayoutDashboard size={18} className="me-1" /> Dashboard</Link>
-//                 </li>
-//                 <li className="nav-item">
-//                   <Link className="nav-link mx-2 text-white" to="/upload"><FileUp size={18} className="me-1" /> Materials</Link>
-//                 </li>
-//                 <li className="nav-item">
-//                   <Link className="nav-link mx-2 text-white" to="/generate"><ClipboardCheck size={18} className="me-1" /> Generate</Link>
-//                 </li>
-//                 <li className="nav-item">
-//                   <Link className="nav-link mx-2 text-white" to="/check"><CheckSquare size={18} className="me-1" /> Checker</Link>
-//                 </li>
-//                 <li className="nav-item">
-//                   <Link className="nav-link mx-2 text-white" to="/history"><HistoryIcon size={18} className="me-1" /> History</Link>
-//                 </li>
-//                 <li className="nav-item ms-3">
-//                   <div className="d-flex align-items-center bg-glass p-2 rounded-pill">
-//                     <img 
-//                       src={user.profilePicture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=6366f1&color=fff`} 
-//                       alt={user.name} 
-//                       className="rounded-circle me-2 shadow-sm" 
-//                       style={{ width: '30px', height: '30px', objectFit: 'cover' }}
-//                       onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=6366f1&color=fff` }}
-//                     />
-//                     <button onClick={logout} className="btn btn-link text-danger p-0 border-0 ms-1" title="Logout"><LogOut size={18} /></button>
-//                   </div>
-//                 </li>
-//               </>
-//             ) : (
-//               <li className="nav-item">
-//                 <span className="nav-link text-secondary">Login to get started</span>
-//               </li>
-//             )}
-//             <li className="nav-item ms-3">
-//               <button onClick={toggleTheme} className="btn btn-link text-white border-0 p-2">
-//                 {theme === 'dark' ? <Sun size={24} /> : <Moon size={24} />}
-//               </button>
-//             </li>
-//           </ul>
-//         </div>
-//       </div>
-//     </nav>
-//   );
-// };
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();

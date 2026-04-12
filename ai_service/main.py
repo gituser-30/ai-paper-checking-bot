@@ -101,32 +101,42 @@ async def extract_text_url(request: dict):
                     if extracted:
                         text += extracted + "\n"
 
+            # MAX TEXT LIMIT for Digital Extraction (120k chars ~ 30k tokens)
+            # If exceeded, we take chunks to keep context within Llama's window
+            if len(text) > 120000:
+                print(f"Digital text too large ({len(text)} chars). Truncating intelligently...")
+                text = text[:60000] + "\n\n[... content truncated for brevity ...]\n\n" + text[-40000:]
+
             # Step 2: If not enough text (scanned/handwritten), fall back to Vision OCR
             if len(text.strip()) < 300:
                 print("Digital extraction insufficient. Falling back to Vision OCR...")
                 text = ""
                 doc = fitz.open(stream=content, filetype="pdf")
+                
+                # Increased limit to 60 pages for startup-grade scale
+                page_count = min(len(doc), 60)
                 all_page_images = []
 
-                for i in range(min(len(doc), 30)):
+                for i in range(page_count):
                     page = doc.load_page(i)
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better OCR
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
                     img_bytes = pix.tobytes("jpeg")
                     encoded = base64.b64encode(img_bytes).decode("utf-8")
                     all_page_images.append(encoded)
 
-                # Batch: 5 pages per API call (Groq Vision limit)
+                # Parallel Batch Processing: 5 pages per API call
                 BATCH_SIZE = 5
-                for batch_start in range(0, len(all_page_images), BATCH_SIZE):
-                    batch = all_page_images[batch_start: batch_start + BATCH_SIZE]
+                tasks = []
 
+                import asyncio
+
+                async def process_ocr_batch(batch, batch_start):
                     content_list = [
                         {
                             "type": "text",
                             "text": (
                                 f"These are pages {batch_start + 1} to {batch_start + len(batch)} of a document. "
-                                "Extract ALL text exactly as written. Preserve headings, bullet points, "
-                                "numbered lists, and paragraph structure. Return ONLY the extracted text."
+                                "Extract ALL text exactly as written. Return ONLY the extracted text."
                             ),
                         }
                     ]
@@ -137,12 +147,29 @@ async def extract_text_url(request: dict):
                                 "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"},
                             }
                         )
-
-                    res = client.chat.completions.create(
-                        model="meta-llama/llama-4-scout-17b-16e-instruct",
-                        messages=[{"role": "user", "content": content_list}],
+                    
+                    # We create a completion in a thread since the groq client might be synchronous/blocking 
+                    # or ensure we use a wrapper. Groq SDK is traditionally synchronous, 
+                    # but we can run it in a thread pool to avoid blocking the event loop.
+                    loop = asyncio.get_event_loop()
+                    res = await loop.run_in_executor(
+                        None, 
+                        lambda: client.chat.completions.create(
+                            model="meta-llama/llama-4-scout-17b-16e-instruct",
+                            messages=[{"role": "user", "content": content_list}],
+                        )
                     )
-                    text += res.choices[0].message.content + "\n\n"
+                    return res.choices[0].message.content
+
+                # Create all tasks for parallel execution
+                for batch_start in range(0, len(all_page_images), BATCH_SIZE):
+                    batch_slice = all_page_images[batch_start: batch_start + BATCH_SIZE]
+                    tasks.append(process_ocr_batch(batch_slice, batch_start))
+
+                if tasks:
+                    print(f"Processing {len(tasks)} OCR batches in parallel...")
+                    results = await asyncio.gather(*tasks)
+                    text = "\n\n".join(results)
 
         else:
             # Image file: Vision OCR directly

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { FileText, Eye, Trash2, Calendar, FileQuestion, ExternalLink, Loader2 } from 'lucide-react';
+import { FileText, Eye, Trash2, Calendar, FileQuestion, Sparkles, Loader2, ChevronRight, Zap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const History = () => {
     const { user } = useAuth();
@@ -26,7 +27,7 @@ const History = () => {
     }, [user]);
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this paper?")) return;
+        if (!window.confirm("Archiving this paper will remove it from your dashboard. Proceed?")) return;
         try {
             await api.delete(`/papers/${id}`);
             setPapers(papers.filter(p => p._id !== id));
@@ -35,67 +36,97 @@ const History = () => {
         }
     };
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    };
+
+    const itemVariants = {
+        hidden: { y: 20, opacity: 0 },
+        visible: { y: 0, opacity: 1, transition: { duration: 0.4 } }
+    };
+
     return (
-        <div className="container mt-4 pb-5">
-            <h1 className="fw-bold gradient-text mb-4">Paper History</h1>
-            <p className="text-secondary mb-5">Access and manage all your previously generated question papers.</p>
+        <motion.div 
+            className="container mt-4 pb-5"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+        >
+            <motion.div variants={itemVariants} className="mb-5">
+                <h1 className="fw-900 gradient-text mb-2">Paper Archive</h1>
+                <p className="text-secondary fw-medium opacity-80">Track and manage your generated history with industrial-grade AI synthesis.</p>
+            </motion.div>
 
             {loading ? (
-                <div className="text-center py-5">
-                    <Loader2 className="spinner-border text-primary" size={40} style={{border: 'none'}} />
-                    <p className="mt-3 text-secondary">Loading history...</p>
+                <div className="text-center py-5 my-5">
+                    <Loader2 className="animate-spin text-primary mb-3 mx-auto" size={48} />
+                    <p className="fw-bold text-secondary text-uppercase tracking-widest small">Synchronizing...</p>
                 </div>
             ) : papers.length === 0 ? (
-                <div className="glass-card p-5 text-center">
-                    <FileQuestion size={64} className="text-secondary opacity-25 mb-4" />
-                    <h4 className="fw-bold">No Papers Found</h4>
-                    <p className="text-secondary mb-4">You haven't generated any papers yet. Start now!</p>
-                    <Link to="/generate" className="btn btn-glass px-4">Create First Paper</Link>
-                </div>
+                <motion.div variants={itemVariants} className="glass-card p-5 text-center shadow-2xl">
+                    <div className="p-4 bg-glass rounded-circle mb-4 d-inline-block border border-glass">
+                        <FileQuestion size={48} className="text-secondary opacity-30" />
+                    </div>
+                    <h3 className="fw-900 mb-2">No Records Detected</h3>
+                    <p className="text-secondary mb-4 fs-5 opacity-70">Your academic archive is currently pristine. Create your first exam to begin.</p>
+                    <button onClick={() => navigate('/generate')} className="btn btn-primary-gradient px-5 py-3 rounded-4 fw-bold text-uppercase tracking-widest">
+                        Generate New Paper
+                    </button>
+                </motion.div>
             ) : (
                 <div className="row g-4">
-                    {papers.map((paper) => (
-                        <div key={paper._id} className="col-md-6 col-lg-4">
-                            <div className="glass-card h-100 p-4 d-flex flex-column animate-slide-up">
-                                <div className="d-flex align-items-center mb-3">
-                                    <div className="p-3 bg-glass rounded-4 me-3 text-primary">
-                                        <FileText size={24} />
-                                    </div>
-                                    <div>
-                                        <h5 className="fw-bold mb-0 text-truncate" style={{maxWidth: '180px'}}>{paper.title}</h5>
-                                        <div className="d-flex align-items-center text-secondary small">
-                                            <Calendar size={12} className="me-1" />
-                                            {new Date(paper.createdAt).toLocaleDateString()}
+                    <AnimatePresence>
+                        {papers.map((paper, i) => (
+                            <motion.div 
+                                key={paper._id} 
+                                className="col-md-6 col-lg-4"
+                                variants={itemVariants}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                whileHover={{ y: -8, transition: { duration: 0.2 } }}
+                            >
+                                <div className="glass-card h-100 p-4 border-primary-glow border-opacity-10 shadow-xl group d-flex flex-column">
+                                    <div className="d-flex align-items-start justify-content-between mb-4">
+                                        <div className="p-3 bg-primary bg-opacity-10 text-primary rounded-4">
+                                            <Zap size={24} />
                                         </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-auto">
-                                    <div className="d-flex justify-content-between mb-3 text-secondary small border-top border-secondary pt-3">
-                                        <span>{paper.config.totalMarks} Marks</span>
-                                        <span>{paper.questions.length} Questions</span>
-                                    </div>
-                                    <div className="d-flex gap-2">
-                                        <button 
-                                            onClick={() => navigate(`/generate?id=${paper._id}`)} 
-                                            className="btn btn-glass btn-sm flex-grow-1 d-flex align-items-center justify-content-center"
-                                        >
-                                            <Eye size={16} className="me-2" /> View
-                                        </button>
                                         <button 
                                             onClick={() => handleDelete(paper._id)} 
-                                            className="btn btn-outline-danger btn-sm px-3"
+                                            className="btn btn-glass p-2 rounded-circle hover-danger opacity-0 group-hover-opacity-100 transition-all"
                                         >
                                             <Trash2 size={16} />
                                         </button>
                                     </div>
+
+                                    <div className="mb-4">
+                                        <h5 className="fw-900 mb-1 text-truncate pe-3">{paper.title}</h5>
+                                        <div className="d-flex align-items-center gap-2 text-secondary small fw-bold uppercase tracking-tighter opacity-70">
+                                            <Calendar size={12} />
+                                            {new Date(paper.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-auto">
+                                        <div className="d-flex flex-wrap gap-2 mb-4">
+                                            <span className="badge bg-glass text-primary border border-primary border-opacity-20 px-2 py-1 uppercase">{paper.config.totalMarks} Marks</span>
+                                            <span className="badge bg-glass text-secondary border border-glass px-2 py-1 uppercase">{paper.questions.length} Items</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => navigate(`/generate?id=${paper._id}`)} 
+                                            className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-black text-uppercase small tracking-widest d-flex align-items-center justify-content-center gap-2 group"
+                                        >
+                                            View Artifact <ChevronRight size={16} className="group-hover-translate-x" />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    ))}
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
                 </div>
             )}
-        </div>
+            
+            <div className="noise-bg opacity-10" />
+        </motion.div>
     );
 };
 

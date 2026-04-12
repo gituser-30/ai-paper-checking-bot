@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Settings, Sparkles, Loader2, ListChecks, FileText, Printer, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  Settings, Sparkles, Loader2, ListChecks, FileText, 
+  Printer, CheckCircle, ChevronLeft, ChevronRight, Zap, Info
+} from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Generate = () => {
   const { user } = useAuth();
@@ -33,12 +37,10 @@ const Generate = () => {
         const matId = params.get('materialId');
         if (matId) setSelectedMaterials([matId]);
 
-        // Fetch materials anyway for the dropdown/config step
         const matRes = await api.get(`/materials/user/${user._id}`);
         const processed = matRes.data.filter(m => m.extractedText);
         setMaterials(processed);
 
-        // If paperId present, fetch the paper and jump to FINAL view
         if (paperId) {
           const paperRes = await api.get(`/papers/${paperId}`);
           setPaper(paperRes.data);
@@ -57,7 +59,6 @@ const Generate = () => {
     if (selectedMaterials.length === 0) return;
     setLoading(true);
 
-    // Combine text from all selected materials
     const selectedData = materials.filter(m => selectedMaterials.includes(m._id));
     const combinedText = selectedData.map(m => m.extractedText).join("\n\n---\n\n");
 
@@ -71,16 +72,10 @@ const Generate = () => {
       setPaper(res.data);
       setStep('MARKING');
     } catch (err) {
-      alert('Generation failed');
+      alert('Generation failed. The document might be too large or the AI service timed out.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleUpdateMarks = (index, val) => {
-    const updatedQuestions = [...paper.questions];
-    updatedQuestions[index].marks = parseInt(val) || 0;
-    setPaper({ ...paper, questions: updatedQuestions });
   };
 
   const finalizePaper = async () => {
@@ -100,16 +95,21 @@ const Generate = () => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const variants = {
+    initial: { opacity: 0, x: 20 },
+    enter: { opacity: 1, x: 0, transition: { duration: 0.5, ease: "easeOut" } },
+    exit: { opacity: 0, x: -20, transition: { duration: 0.3 } }
   };
+
+  const isLargeDocument = materials
+    .filter(m => selectedMaterials.includes(m._id))
+    .some(m => m.extractedText?.length > 40000);
 
   return (
     <div className="container mt-4 pb-5">
-      {/* Hide navbar/bg on print */}
       <style>{`
         @media print {
-          .navbar, .btn-glass, .no-print, #three-canvas { display: none !important; }
+          .navbar, .btn-glass, .no-print, #three-canvas, .noise-bg { display: none !important; }
           .container { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 20px !important; }
           .glass-card { background: none !important; border: none !important; box-shadow: none !important; color: black !important; backdrop-filter: none !important; }
           .gradient-text, .text-white, .text-secondary { -webkit-text-fill-color: black !important; color: black !important; }
@@ -117,172 +117,278 @@ const Generate = () => {
         }
       `}</style>
 
-      <div className="d-flex align-items-center justify-content-between mb-4 no-print">
-        <h1 className="fw-bold gradient-text mb-0">Paper Workshop</h1>
-        <div className="d-flex gap-2">
-          <div className={`step-dot ${step === 'CONFIG' ? 'active' : ''}`} />
-          <div className={`step-dot ${step === 'MARKING' ? 'active' : ''}`} />
-          <div className={`step-dot ${step === 'FINAL' ? 'active' : ''}`} />
+      {/* Progress Header */}
+      <div className="d-flex align-items-center justify-content-between mb-5 no-print">
+        <div>
+          <h1 className="fw-extrabold gradient-text mb-1">Paper Workshop</h1>
+          <p className="text-secondary small fw-bold text-uppercase tracking-widest">
+            {step === 'CONFIG' ? 'Step 1: Configuration' : step === 'MARKING' ? 'Step 2: Marking Scheme' : 'Step 3: Export & Print'}
+          </p>
+        </div>
+        <div className="d-flex gap-3">
+          {['CONFIG', 'MARKING', 'FINAL'].map((s, i) => (
+            <div 
+              key={s} 
+              className={`rounded-circle d-flex align-items-center justify-content-center fw-bold transition-all ${
+                step === s ? 'bg-primary text-white scale-125' : 'bg-glass text-secondary'
+              }`}
+              style={{ width: '32px', height: '32px', fontSize: '12px', border: '1px solid var(--border-glass)' }}
+            >
+              {i + 1}
+            </div>
+          ))}
         </div>
       </div>
 
-      {loading && !paper && (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5 my-5">
-          <Loader2 className="spinner-border text-primary mb-3" size={48} style={{ border: 'none' }} />
-          <p className="text-secondary fw-bold">Waking up the AI Examiner...</p>
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        {loading && !paper ? (
+          <motion.div 
+            key="loader"
+            className="d-flex flex-column align-items-center justify-content-center py-5 my-5"
+            variants={variants} initial="initial" animate="enter" exit="exit"
+          >
+            <div className="p-4 bg-glass rounded-circle pulse-primary mb-4 border border-glass">
+              <Sparkles className="text-primary" size={48} />
+            </div>
+            <h4 className="fw-bold mb-2">Analyzing Material...</h4>
+            <p className="text-secondary text-center px-4 max-w-400">
+              Our AI is synthesizing questions and model answers based on your selected materials. 
+              {isLargeDocument && " This is a large document, scaling processing..."}
+            </p>
+            <div className="w-100 max-w-400 mt-4 bg-glass rounded-pill overflow-hidden border border-glass" style={{ height: '8px' }}>
+              <motion.div 
+                className="h-100 bg-primary-gradient"
+                initial={{ width: "0%" }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 15, ease: "linear" }}
+              />
+            </div>
+          </motion.div>
+        ) : step === 'CONFIG' ? (
+          <motion.div 
+            key="config"
+            variants={variants} initial="initial" animate="enter" exit="exit"
+            className="glass-card p-5 max-w-800 mx-auto no-print shadow-2xl"
+          >
+            <h4 className="fw-extrabold mb-4 d-flex align-items-center gap-2">
+              <Settings className="text-primary" /> Setup Requirements
+            </h4>
 
-      {step === 'CONFIG' && !loading && (
-        <div className="glass-card p-5 max-w-800 mx-auto no-print">
-          <h4 className="fw-bold mb-4 d-flex align-items-center"><Settings className="me-2 text-primary" /> Configure Requirements</h4>
-          <div className="mb-4">
-            <label className="form-label text-secondary small fw-bold text-uppercase">Select Study Materials (Multi-select)</label>
-            <div className="bg-glass rounded-4 p-3 border border-secondary border-opacity-25" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-              {materials.length === 0 ? (
-                <p className="small text-secondary mb-0">No processed materials found. Upload some first!</p>
-              ) : (
-                materials.map(m => (
-                  <div key={m._id} className="form-check mb-2">
+            {isLargeDocument && (
+              <div className="p-3 bg-primary bg-opacity-10 border border-primary border-opacity-20 rounded-4 mb-4 d-flex gap-3">
+                <Zap className="text-primary flex-shrink-0" size={20} />
+                <p className="small text-secondary mb-0">
+                  <strong>Scale Detected:</strong> One or more selected files are extensive. We've enabled **Parallel Processing** to keep generation fast.
+                </p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="form-label text-secondary small fw-bold text-uppercase tracking-wider">Target Source Materials</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                {materials.length === 0 ? (
+                  <div className="col-span-2 p-4 text-center border border-dashed border-glass rounded-4 opacity-40">
+                    <p className="small mb-0">No materials ready. Upload a PDF first.</p>
+                  </div>
+                ) : (
+                  materials.map(m => (
+                    <div 
+                      key={m._id} 
+                      onClick={() => {
+                        if (selectedMaterials.includes(m._id)) setSelectedMaterials(selectedMaterials.filter(id => id !== m._id));
+                        else setSelectedMaterials([...selectedMaterials, m._id]);
+                      }}
+                      className={`p-3 rounded-4 cursor-pointer border transition-all d-flex align-items-center gap-3 ${
+                        selectedMaterials.includes(m._id) ? 'bg-primary bg-opacity-10 border-primary' : 'bg-glass border-glass'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-3 ${selectedMaterials.includes(m._id) ? 'bg-primary text-white' : 'bg-glass-heavy text-secondary'}`}>
+                        <FileText size={16} />
+                      </div>
+                      <div className="text-truncate">
+                        <p className="small fw-bold mb-0 text-truncate">{m.title}</p>
+                        <p className="xs text-secondary mb-0 uppercase">{m.fileType}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="row g-4 mb-4">
+              <div className="col-md-6">
+                <label className="form-label text-secondary small fw-bold uppercase">MCQ Quantity</label>
+                <input type="number" className="form-control" value={config.mcqCount} onChange={e => setConfig({ ...config, mcqCount: e.target.value })} />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label text-secondary small fw-bold uppercase">Theory Quantity</label>
+                <input type="number" className="form-control" value={config.theoryCount} onChange={e => setConfig({ ...config, theoryCount: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="mb-5">
+              <label className="form-label text-secondary small fw-bold uppercase">Total Exam Marks</label>
+              <div className="input-group">
+                <span className="input-group-text bg-glass border-glass text-secondary">Σ</span>
+                <input type="number" className="form-control fs-4 fw-bold" value={config.totalMarks} onChange={e => setConfig({ ...config, totalMarks: e.target.value })} />
+              </div>
+            </div>
+
+            <button 
+              disabled={loading || selectedMaterials.length === 0} 
+              onClick={handleGenerate} 
+              className="btn btn-primary-gradient w-100 py-3 rounded-4 text-uppercase tracking-widest fw-bold"
+            >
+              <Sparkles size={20} className="me-2" /> Start AI Generation
+            </button>
+          </motion.div>
+        ) : step === 'MARKING' ? (
+          <motion.div 
+            key="marking"
+            variants={variants} initial="initial" animate="enter" exit="exit"
+            className="glass-card p-5 no-print"
+          >
+            <div className="d-flex justify-content-between align-items-center mb-5 border-bottom border-glass pb-4">
+              <h4 className="fw-extrabold mb-0 d-flex align-items-center gap-2">
+                <ListChecks className="text-primary" /> Mark Allocation
+              </h4>
+              <div className="px-4 py-2 bg-glass rounded-pill border border-glass">
+                <span className="text-secondary small fw-bold me-2 uppercase">Progress:</span>
+                <span className={`fw-bold ${paper.questions.reduce((a, q) => a + (q.marks || 0), 0) == config.totalMarks ? "text-success" : "text-primary"}`}>
+                  {paper.questions.reduce((a, q) => a + (q.marks || 0), 0)}
+                </span>
+                <span className="text-secondary fw-bold ms-1">/ {config.totalMarks}</span>
+              </div>
+            </div>
+
+            <div className="d-flex flex-column gap-3">
+              {paper.questions.map((q, i) => (
+                <motion.div 
+                  key={i} 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="p-3 bg-glass rounded-4 d-flex align-items-center gap-4 hover-bg-glass-heavy transition-all border border-glass"
+                >
+                  <div className="fs-5 fw-extrabold text-secondary opacity-30 px-2" style={{ width: '40px' }}>{String(i + 1).padStart(2, '0')}</div>
+                  <div className="flex-grow-1 min-w-0">
+                    <p className="mb-1 fw-medium text-truncate-2" style={{ fontSize: '0.95rem' }}>{q.questionText}</p>
+                    <span className="badge bg-glass text-secondary font-monospace tracking-tighter uppercase p-1 px-2">{q.questionType}</span>
+                  </div>
+                  <div style={{ width: '90px' }}>
                     <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id={m._id}
-                      checked={selectedMaterials.includes(m._id)}
+                      type="number"
+                      className="form-control text-center py-2 fw-bold"
+                      placeholder="Marks"
+                      value={q.marks || ''}
                       onChange={(e) => {
-                        if (e.target.checked) setSelectedMaterials([...selectedMaterials, m._id]);
-                        else setSelectedMaterials(selectedMaterials.filter(id => id !== m._id));
+                        const updatedQuestions = [...paper.questions];
+                        updatedQuestions[i].marks = parseInt(e.target.value) || 0;
+                        setPaper({ ...paper, questions: updatedQuestions });
                       }}
                     />
-                    <label className="form-check-label small cursor-pointer" htmlFor={m._id}>
-                      {m.title} <span className="opacity-50">• {m.fileType.toUpperCase()}</span>
-                    </label>
                   </div>
-                ))
-              )}
+                </motion.div>
+              ))}
             </div>
-          </div>
 
-          <div className="row g-3 mb-4">
-            <div className="col-md-6">
-              <label className="form-label text-secondary">MCQ Count</label>
-              <input type="number" className="form-control border-secondary" value={config.mcqCount} onChange={e => setConfig({ ...config, mcqCount: e.target.value })} />
+            <div className="d-flex gap-3 mt-5">
+              <button className="btn btn-glass px-4" onClick={() => setStep('CONFIG')}>Back</button>
+              <button onClick={finalizePaper} className="btn btn-primary-gradient flex-grow-1 py-3 rounded-4 fw-bold text-uppercase tracking-wider">
+                <CheckCircle size={20} className="me-2" /> Finalize Exam Paper
+              </button>
             </div>
-            <div className="col-md-6">
-              <label className="form-label text-secondary">Theory Count</label>
-              <input type="number" className="form-control border-secondary" value={config.theoryCount} onChange={e => setConfig({ ...config, theoryCount: e.target.value })} />
-            </div>
-          </div>
-
-          <div className="mb-5">
-            <label className="form-label text-secondary">Total Paper Marks</label>
-            <input type="number" className="form-control border-secondary fs-4 fw-bold" value={config.totalMarks} onChange={e => setConfig({ ...config, totalMarks: e.target.value })} />
-          </div>
-
-          <button disabled={loading || selectedMaterials.length === 0} onClick={handleGenerate} className="btn btn-glass w-100 py-3 d-flex align-items-center justify-content-center">
-            {loading ? <Loader2 className="spinner-border me-2" style={{ border: 'none' }} /> : <><Sparkles size={20} className="me-2" /> Generate Draft Questions from {selectedMaterials.length} files</>}
-          </button>
-        </div>
-      )}
-
-      {step === 'MARKING' && (
-        <div className="glass-card p-5 no-print animate-slide-up">
-          <div className="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
-            <h4 className="fw-bold mb-0"><ListChecks className="me-2 text-primary" /> Assign Marks to Questions</h4>
-            <div className="text-end">
-              <p className="mb-0 text-secondary">Total Progress: <span className={paper.questions.reduce((a, q) => a + (q.marks || 0), 0) == config.totalMarks ? "text-success" : "text-danger"}>{paper.questions.reduce((a, q) => a + (q.marks || 0), 0)}</span> / {config.totalMarks}</p>
-            </div>
-          </div>
-
-          {paper.questions.map((q, i) => (
-            <div key={i} className="mb-4 p-3 bg-glass rounded-3 d-flex align-items-center gap-3">
-              <span className="badge bg-glass-heavy text-white fs-6">{i + 1}</span>
-              <div className="flex-grow-1">
-                <p className="mb-1">{q.questionText}</p>
-                <span className="small text-secondary">{q.questionType.toUpperCase()}</span>
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="final"
+            variants={variants} initial="initial" animate="enter" exit="exit"
+          >
+            <div className="no-print d-flex flex-wrap gap-3 justify-content-between align-items-center mb-5">
+              <div className="d-flex bg-glass p-1 rounded-pill border border-glass">
+                <button 
+                  onClick={() => setViewMode('QUESTION_PAPER')} 
+                  className={`btn btn-sm px-4 rounded-pill transition-all ${viewMode === 'QUESTION_PAPER' ? 'btn-primary-gradient shadow-sm' : 'border-0 text-secondary'}`}
+                >
+                  Question Paper
+                </button>
+                <button 
+                  onClick={() => setViewMode('ANSWER_KEY')} 
+                  className={`btn btn-sm px-4 rounded-pill transition-all ${viewMode === 'ANSWER_KEY' ? 'btn-primary-gradient shadow-sm' : 'border-0 text-secondary'}`}
+                >
+                  Answer Key
+                </button>
               </div>
-              <div style={{ width: '100px' }}>
-                <input
-                  type="number"
-                  className="form-control border-secondary"
-                  placeholder="Marks"
-                  value={q.marks || ''}
-                  onChange={(e) => handleUpdateMarks(i, e.target.value)}
-                />
-              </div>
-            </div>
-          ))}
-
-          <div className="d-flex gap-3 mt-5">
-            <button className="btn btn-outline-secondary px-4 py-2" onClick={() => setStep('CONFIG')}>Back</button>
-            <button onClick={finalizePaper} className="btn btn-glass flex-grow-1 py-3 d-flex align-items-center justify-content-center">
-              {loading ? <Loader2 className="spinner-border me-2" style={{ border: 'none' }} /> : <><CheckCircle size={20} className="me-2" /> Finalize & Save Paper</>}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {step === 'FINAL' && (
-        <div className="animate-slide-up">
-          <div className="no-print d-flex justify-content-between align-items-center mb-5">
-            <div className="btn-group bg-glass p-1 rounded-3">
-              <button onClick={() => setViewMode('QUESTION_PAPER')} className={`btn btn-sm ${viewMode === 'QUESTION_PAPER' ? 'btn-primary' : 'border-0'}`} style={{ color: viewMode === 'QUESTION_PAPER' ? 'white' : 'var(--text-primary)' }}>Question Paper</button>
-              <button onClick={() => setViewMode('ANSWER_KEY')} className={`btn btn-sm ${viewMode === 'ANSWER_KEY' ? 'btn-primary' : 'border-0'}`} style={{ color: viewMode === 'ANSWER_KEY' ? 'white' : 'var(--text-primary)' }}>Answer Key</button>
-            </div>
-            <div className="d-flex gap-2">
-              <button onClick={handlePrint} className="btn btn-glass d-flex align-items-center"><Printer size={18} className="me-2" /> Print / Save PDF</button>
-              <button onClick={() => navigate('/dashboard')} className="btn btn-outline-light">Home</button>
-            </div>
-          </div>
-
-          <div className="glass-card p-5" id="printable-paper">
-            <div className="text-center mb-5 border-bottom border-3 border-dark pb-4">
-              <h1 className="fw-bold text-uppercase">{viewMode === 'QUESTION_PAPER' ? 'Question Paper' : 'Official Answer Key'}</h1>
-              <p className="mb-0 fs-5">{paper.title}</p>
-              <div className="d-flex justify-content-between mt-4 text-uppercase fw-bold small">
-                <span>Time: As Per Guidelines</span>
-                <span>Total Marks: {paper.config.totalMarks}</span>
+              <div className="d-flex gap-2">
+                <button onClick={handlePrint} className="btn btn-primary shadow-lg px-4 d-flex align-items-center gap-2 rounded-4">
+                  <Printer size={18} /> Print & Save PDF
+                </button>
+                <button onClick={() => navigate('/dashboard')} className="btn btn-glass px-4 rounded-4">Exit</button>
               </div>
             </div>
 
-            {paper.questions.map((q, i) => (
-              <div key={i} className="mb-5">
-                <div className="d-flex justify-content-between mb-3">
-                  <div className="d-flex">
-                    <span className="fw-bold me-2">Q{i + 1}.</span>
-                    <span>{q.questionText}</span>
-                  </div>
-                  <span className="fw-bold">[{q.marks}m]</span>
+            <div className="glass-card p-5 mb-5 shadow-2xl" id="printable-paper" style={{ background: 'white', color: '#000' }}>
+              <div className="text-center mb-5 border-bottom border-4 border-dark pb-5">
+                <div className="d-flex align-items-center justify-content-center gap-2 mb-2 opacity-10">
+                  <Sparkles size={20} strokeWidth={3} />
+                  <span className="small fw-extrabold tracking-tighter uppercase">Generated by EvalyzeAI</span>
                 </div>
-
-                {q.questionType === 'mcq' && (
-                  <div className="row g-2 ms-4">
-                    {q.options.map((opt, idx) => (
-                      <div key={idx} className="col-6 mb-1">{String.fromCharCode(65 + idx)}) {opt}</div>
-
-                    ))}
-                  </div>
-                )}
-
-                {viewMode === 'ANSWER_KEY' && (
-                  <div className="mt-3 p-3 border border-dark rounded bg-light text-dark">
-                    <span className="fw-bold me-2">
-                      {q.questionType === 'mcq' ? 'Correct Answer:' : 'Model Answer (Professor Logic):'}
-                    </span>
-                    <div className={q.questionType === 'theory' ? 'mt-2 border-top border-secondary border-opacity-25 pt-2' : 'd-inline'}>
-                      {q.correctAnswer}
-                    </div>
-                  </div>
-                )}
+                <h1 className="fw-900 text-uppercase tracking-tighter mb-2" style={{ fontSize: '3rem' }}>
+                  {viewMode === 'QUESTION_PAPER' ? 'Question Paper' : 'Answer Key'}
+                </h1>
+                <p className="mb-0 fs-3 fw-medium">{paper.title}</p>
+                <div className="d-flex justify-content-between mt-5 text-uppercase fw-extrabold" style={{ letterSpacing: '2px' }}>
+                  <span>Code: {paper._id.slice(-6).toUpperCase()}</span>
+                  <span>Max Marks: {paper.config.totalMarks}</span>
+                </div>
               </div>
-            ))}
 
-            <div className="text-center mt-5 pt-5 opacity-50 border-top border-dark small">
-              Paper Generated by AI Examiner Integration System
+              <div className="d-flex flex-column gap-5">
+                {paper.questions.map((q, i) => (
+                  <div key={i} className="position-relative">
+                    <div className="d-flex justify-content-between align-items-start mb-3">
+                      <div className="d-flex gap-3">
+                        <span className="fw-900 fs-4 text-dark opacity-40">Q{i + 1}</span>
+                        <span className="fs-5 fw-medium pt-1 pe-5">{q.questionText}</span>
+                      </div>
+                      <span className="fw-900 border border-dark border-3 rounded-3 px-3 py-1 mt-1">[{q.marks}]</span>
+                    </div>
+
+                    {q.questionType === 'mcq' && (
+                      <div className="row g-4 ms-5 mt-2">
+                        {q.options.map((opt, idx) => (
+                          <div key={idx} className="col-md-6 mb-2 fs-5">
+                            <span className="fw-black me-2 opacity-50">{String.fromCharCode(65 + idx)})</span> 
+                            {opt}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {viewMode === 'ANSWER_KEY' && (
+                      <div className="mt-4 ms-5 border-start border-4 border-primary bg-primary bg-opacity-5 p-4 rounded-end-4 shadow-sm">
+                        <div className="d-flex align-items-center gap-2 mb-2">
+                          <Info size={16} className="text-primary" />
+                          <span className="small fw-black text-uppercase text-primary letter-spacing-1">
+                            {q.questionType === 'mcq' ? 'AI Solution Path' : 'Structure Rubric'}
+                          </span>
+                        </div>
+                        <p className="mb-0 fs-5 lh-lg text-dark fw-medium">
+                          {q.correctAnswer}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-center mt-5 pt-5 opacity-40 border-top border-dark border-opacity-10 small fw-bold text-uppercase italic">
+                Securely synthesised using high-speed Llama 4 Scout LLM Core • Verify against curriculum.
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
