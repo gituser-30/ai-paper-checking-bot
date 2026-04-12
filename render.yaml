@@ -36,13 +36,12 @@ services:
         value: 8000 # Force Render to use 8000 internally
 
   # 3. Frontend Static Site
-  - type: web
+  - type: static
     name: ai-paper-client
-    env: static
     plan: free
     rootDir: client
     buildCommand: npm install --legacy-peer-deps && npm run build
-    staticPublishPath: dist
+    publishPath: dist
     routes:
       - type: rewrite
         source: /*
