@@ -108,8 +108,8 @@ const History = () => {
 
                                     <div className="mt-auto">
                                         <div className="d-flex flex-wrap gap-2 mb-4">
-                                            <span className="badge bg-glass text-primary border border-primary border-opacity-20 px-2 py-1 uppercase">{paper.config.totalMarks} Marks</span>
-                                            <span className="badge bg-glass text-secondary border border-glass px-2 py-1 uppercase">{paper.questions.length} Items</span>
+                                            <span className="badge bg-glass text-primary border border-primary border-opacity-20 px-2 py-1 uppercase">{paper.config?.totalMarks || 0} Marks</span>
+                                            <span className="badge bg-glass text-secondary border border-glass px-2 py-1 uppercase">{paper.questions?.length || 0} Items</span>
                                         </div>
                                         <button 
                                             onClick={() => navigate(`/generate?id=${paper._id}`)} 
