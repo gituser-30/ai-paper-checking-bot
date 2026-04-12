@@ -113,8 +113,8 @@ async def extract_text_url(request: dict):
                 text = ""
                 doc = fitz.open(stream=content, filetype="pdf")
                 
-                # Increased limit to 60 pages for startup-grade scale
-                page_count = min(len(doc), 60)
+                # Reduce limits to respect Groq Free Tier (15 pages max, to avoid 429 errors)
+                page_count = min(len(doc), 15)
                 all_page_images = []
 
                 for i in range(page_count):
@@ -161,15 +161,18 @@ async def extract_text_url(request: dict):
                     )
                     return res.choices[0].message.content
 
-                # Create all tasks for parallel execution
+                # Create all tasks for sequential execution to prevent 429 Rate Limits
+                results = []
                 for batch_start in range(0, len(all_page_images), BATCH_SIZE):
                     batch_slice = all_page_images[batch_start: batch_start + BATCH_SIZE]
-                    tasks.append(process_ocr_batch(batch_slice, batch_start))
+                    print(f"Processing OCR batch starting at page {batch_start + 1}...")
+                    try:
+                        res_text = await process_ocr_batch(batch_slice, batch_start)
+                        results.append(res_text)
+                    except Exception as e:
+                        print(f"Batch OCR skipped due to limit: {e}")
 
-                if tasks:
-                    print(f"Processing {len(tasks)} OCR batches in parallel...")
-                    results = await asyncio.gather(*tasks)
-                    text = "\n\n".join(results)
+                text = "\n\n".join(results)
 
         else:
             # Image file: Vision OCR directly
@@ -279,7 +282,7 @@ Return ONLY a valid JSON object in this exact format:
 }}
 
 === STUDY MATERIAL ===
-{request.material_text[:50000]}
+{request.material_text[:35000]}
 """
 
     try:
