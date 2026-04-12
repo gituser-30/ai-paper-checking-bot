@@ -41,7 +41,7 @@ app.use('/api/papers', require('./routes/papers'));
 app.use('/api/submissions', require('./routes/submissions'));
 
 // Fallback for SPA: Send index.html for any unknown routes
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
 });
 
