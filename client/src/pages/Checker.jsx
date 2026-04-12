@@ -253,7 +253,7 @@ const Checker = () => {
             {/* AI Global Commentary */}
             <div className="glass-card p-4 mb-5 border-primary-glow border-opacity-10 bg-glass-heavy">
                <h6 className="fw-black text-primary uppercase letter-spacing-1 mb-3 d-flex align-items-center gap-2">
-                 <Award size={18} /> Global Examiner Feedback
+                 <Award size={18} /> Global EvalyzeAI Feedback
                </h6>
                <p className="mb-0 fs-5 fw-medium text-secondary lh-lg italic">"{evaluation.overallComment}"</p>
             </div>

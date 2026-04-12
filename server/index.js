@@ -11,6 +11,10 @@ if (missingVars.length > 0) {
 } else {
   console.log('Environment variables loaded successfully.');
 }
+
+const path = require('path');
+
+
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
@@ -34,7 +38,16 @@ app.use('/api/materials', require('./routes/materials'));
 app.use('/api/papers', require('./routes/papers'));
 app.use('/api/submissions', require('./routes/submissions'));
 
-app.get('/', (req, res) => res.send('API Running'));
+app.get('/api', (req, res) => res.send('API Running'));
+
+// Serve static assets (JS, CSS, etc.)
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// Fix for React Router (Catch-all)
+// Using app.use() without a path avoids path-to-regexp entirely, fixing Express 5 crashes
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
+});
 
 const PORT = process.env.PORT || 5000;
 
