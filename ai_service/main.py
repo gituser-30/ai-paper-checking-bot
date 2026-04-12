@@ -1,15 +1,16 @@
 import os
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import groq
-import pdfplumber
+import json
+import httpx
+import fitz  # PyMuPDF
 import io
 import base64
+import pdfplumber
 from typing import List
 from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import groq
 from dotenv import load_dotenv
-import requests
-import fitz  # PyMuPDF
 
 load_dotenv()
 
@@ -29,6 +30,10 @@ if not GROQ_API_KEY:
 
 client = groq.Groq(api_key=GROQ_API_KEY)
 
+
+# ---------------------------------------------------------------------------
+# Pydantic Models
+# ---------------------------------------------------------------------------
 class PaperGenerationRequest(BaseModel):
     material_text: str
     pattern: str
@@ -37,202 +42,571 @@ class PaperGenerationRequest(BaseModel):
     mcq_count: int = 0
     theory_count: int = 0
 
+
+class EvaluationRequest(BaseModel):
+    """
+    Accept a plain JSON body instead of form-encoded data.
+    This avoids FastAPI's List[str] = Form() parsing bugs with URLSearchParams.
+    """
+    image_urls: List[str]
+    paper_json: str  # JSON string of paper.questions array
+
+
+class RawEvaluationRequest(BaseModel):
+    """
+    Used when the student uploads the question paper directly at evaluation time.
+    The AI first reads/OCRs the question paper to extract questions,
+    then evaluates the answer sheet images against those questions.
+    """
+    question_paper_urls: List[str]   # Images/PDF pages of the question paper
+    answer_sheet_urls: List[str]     # Images of the student's handwritten answers
+    total_marks: int = 100           # Total marks for the paper (user-provided)
+
+
+# ---------------------------------------------------------------------------
+# Health Check
+# ---------------------------------------------------------------------------
 @app.get("/")
 def read_root():
     return {"status": "AI Service Running"}
 
+
+# ---------------------------------------------------------------------------
+# ENDPOINT 1: Extract text from a PDF or image URL
+# FIX: Use httpx (async) instead of requests (sync/blocking)
+# FIX: OCR threshold raised from 100 to 300 chars
+# FIX: Batch OCR in groups of 5 pages (Groq Vision API limit)
+# ---------------------------------------------------------------------------
 @app.post("/extract-text-url")
 async def extract_text_url(request: dict):
     file_url = request.get("file_url")
     file_type = request.get("file_type")
-    
+
+    if not file_url:
+        raise HTTPException(status_code=400, detail="file_url is required")
+
     try:
-        response = requests.get(file_url)
-        content = response.content
+        async with httpx.AsyncClient(timeout=60.0) as http_client:
+            response = await http_client.get(file_url)
+            response.raise_for_status()
+            content = response.content
+
         text = ""
-        
-        if file_type == 'pdf':
+
+        if file_type == "pdf":
+            # Step 1: Try digital (text-layer) extraction — fast and clean
             with pdfplumber.open(io.BytesIO(content)) as pdf:
                 for page in pdf.pages:
-                    text += page.extract_text() or ""
-            
-            # OCR FALLBACK: If digital extraction failed (e.g. handwritten/scanned)
-            if len(text.strip()) < 100:
-                print("Digital extraction failed or returned minimal text. Falling back to OCR...")
-                text = "" # Reset and start OCR
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
+
+            # Step 2: If not enough text (scanned/handwritten), fall back to Vision OCR
+            if len(text.strip()) < 300:
+                print("Digital extraction insufficient. Falling back to Vision OCR...")
+                text = ""
                 doc = fitz.open(stream=content, filetype="pdf")
-                
                 all_page_images = []
-                # Limit to first 30 pages to avoid API limits/time
+
                 for i in range(min(len(doc), 30)):
                     page = doc.load_page(i)
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) # Zoom for better OCR
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better OCR
                     img_bytes = pix.tobytes("jpeg")
-                    encoded = base64.b64encode(img_bytes).decode('utf-8')
+                    encoded = base64.b64encode(img_bytes).decode("utf-8")
                     all_page_images.append(encoded)
-                
-                # Call Groq Vision for OCR
-                content_list = [{"type": "text", "text": "Extract all text from these handwritten or scanned pages accurately. Return only the extracted text."}]
-                for img_b64 in all_page_images:
-                    content_list.append({
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
-                    })
-                
-                res = client.chat.completions.create(
-                    model="llama-3.2-11b-vision-preview",
-                    messages=[{"role": "user", "content": content_list}],
-                )
-                text = res.choices[0].message.content
-        else:
-            # For images, we use Vison OCR even for extraction
-            encoded_image = base64.b64encode(content).decode('utf-8')
-            prompt = "Extract all text from this image accurately."
-            res = client.chat.completions.create(
-                model="llama-3.2-11b-vision-preview",
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
+
+                # Batch: 5 pages per API call (Groq Vision limit)
+                BATCH_SIZE = 5
+                for batch_start in range(0, len(all_page_images), BATCH_SIZE):
+                    batch = all_page_images[batch_start: batch_start + BATCH_SIZE]
+
+                    content_list = [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"These are pages {batch_start + 1} to {batch_start + len(batch)} of a document. "
+                                "Extract ALL text exactly as written. Preserve headings, bullet points, "
+                                "numbered lists, and paragraph structure. Return ONLY the extracted text."
+                            ),
+                        }
                     ]
-                }],
+                    for img_b64 in batch:
+                        content_list.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"},
+                            }
+                        )
+
+                    res = client.chat.completions.create(
+                        model="meta-llama/llama-4-scout-17b-16e-instruct",
+                        messages=[{"role": "user", "content": content_list}],
+                    )
+                    text += res.choices[0].message.content + "\n\n"
+
+        else:
+            # Image file: Vision OCR directly
+            encoded_image = base64.b64encode(content).decode("utf-8")
+            res = client.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Extract ALL text from this image exactly as written. "
+                                    "Preserve headings, bullet points, numbered lists, and paragraph structure. "
+                                    "Return ONLY the extracted text."
+                                ),
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"},
+                            },
+                        ],
+                    }
+                ],
             )
             text = res.choices[0].message.content
-            
-        return {"text": text}
+
+        return {"text": text.strip()}
+
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to download file: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ---------------------------------------------------------------------------
+# ENDPOINT 2: Generate a question paper from study material
+# FIX: Theory answers must be 5-8 sentence detailed model answers
+# FIX: MCQ options use A)/B)/C)/D) labels, correctAnswer = full option text
+# ---------------------------------------------------------------------------
 @app.post("/generate-paper")
 async def generate_paper(request: PaperGenerationRequest):
     print(f"--- GENERATION START ---")
     print(f"Material Length: {len(request.material_text)} chars")
-    print(f"Config: {request.mcq_count} MCQs, {request.theory_count} Theory, Difficulty: {request.difficulty}")
-    
+    print(
+        f"Config: {request.mcq_count} MCQs, {request.theory_count} Theory, "
+        f"Difficulty: {request.difficulty}, Total Marks: {request.total_marks}"
+    )
+
     prompt = f"""
-    You are an Expert University Professor and Subject Matter Expert. 
-    Your task is to generate a high-quality, academically rigorous question paper based ONLY on the core educational content provided.
-    
-    ### CRITICAL INSTRUCTIONS:
-    1. **IGNORE NON-EDUCATIONAL CONTENT**: Strictly ignore any acknowledgments, prefaces, author biographies, index pages, forewords, or introductory fluff.
-    2. **FOCUS ON CHAPTERS**: Dive deep into the actual chapters, technical concepts, implementation details, and theoretical foundations.
-    3. **THINK LIKE A PROFESSOR**: Prioritize conceptual understanding, critical thinking, and problem-solving over simple definitions.
-    
-    ### PAPER SPECIFICATIONS:
-    - **Difficulty Level**: {request.difficulty}
-    - **Total Target Marks**: {request.total_marks}
-    - **MCQ Count**: {request.mcq_count}
-    - **Theory/Subjective Count**: {request.theory_count}
-    
-    ### RULES:
-    1. STRICTLY generate exactly {request.mcq_count} Multiple Choice Questions.
-    2. STRICTLY generate exactly {request.theory_count} Theory/Subjective Questions.
-    3. For {request.difficulty} difficulty:
-       - Beginner: Direct, fundamental concepts.
-       - Intermediate: Conceptual application and scenario-based.
-       - Advance: Deep analysis, synthesis, and complex problem-solving.
-    4. Set all "marks" fields to 0 (marks will be assigned manually by the user later).
-    
-    Return the response strictly in JSON format:
-    {{
-        "questions": [
-            {{
-                "questionText": "...",
-                "questionType": "mcq" or "theory",
-                "options": ["...", "..."], // only for mcq
-                "correctAnswer": "...", // For MCQ it is the correct option (A, B, C etc). For Theory it is a DETAILED Professor's Model Answer.
-                "marks": 0
-            }}
-        ]
-    }}
-    
-    ### STUDY MATERIAL:
-    {request.material_text[:50000]}
-    """
-    
+You are an Expert University Professor and Subject Matter Expert.
+Your task is to generate a high-quality, academically rigorous question paper
+based ONLY on the core educational content provided below.
+
+=== PAPER SPECIFICATIONS ===
+- Difficulty Level : {request.difficulty}
+- Total Target Marks: {request.total_marks}
+- MCQ Questions     : {request.mcq_count}
+- Theory Questions  : {request.theory_count}
+
+=== STRICT RULES ===
+1. IGNORE non-educational content: acknowledgments, prefaces, author bios, index pages, forewords.
+2. FOCUS on chapters, technical concepts, definitions, mechanisms, algorithms, and examples.
+3. Generate EXACTLY {request.mcq_count} MCQ questions and EXACTLY {request.theory_count} theory questions.
+4. Set all "marks" fields to 0 (marks will be assigned manually later).
+
+=== DIFFICULTY GUIDELINES ===
+- Beginner: Definitions, basic concepts, fill-in-the-blank style theory.
+- Intermediate: Application, scenario-based, comparison between concepts.
+- Advance: Deep analysis, synthesis, case studies, architectural design questions.
+
+=== MCQ FORMAT RULES ===
+- Every MCQ MUST have exactly 4 options labeled: "A) ...", "B) ...", "C) ...", "D) ..."
+- The "correctAnswer" field MUST be the FULL option string (e.g., "A) Binary Search Tree")
+- Options must be meaningfully distinct.
+
+=== THEORY FORMAT RULES ===
+- Every theory "correctAnswer" MUST be a DETAILED MODEL ANSWER of at least 5 to 8 sentences.
+- It MUST include:
+    a) A clear definition or opening statement
+    b) The working mechanism or key steps
+    c) A real-world example or use case
+    d) Advantages or disadvantages where applicable
+    e) A closing remark or conclusion
+- ONE-LINE ANSWERS ARE STRICTLY FORBIDDEN for theory questions.
+
+=== REQUIRED JSON OUTPUT FORMAT ===
+Return ONLY a valid JSON object in this exact format:
+{{
+    "questions": [
+        {{
+            "questionText": "Write the full question here?",
+            "questionType": "mcq",
+            "options": ["A) Option one", "B) Option two", "C) Option three", "D) Option four"],
+            "correctAnswer": "A) Option one",
+            "marks": 0
+        }},
+        {{
+            "questionText": "Write the full theory question here?",
+            "questionType": "theory",
+            "options": [],
+            "correctAnswer": "Detailed model answer of 5-8 sentences covering definition, mechanism, example, advantages, and conclusion.",
+            "marks": 0
+        }}
+    ]
+}}
+
+=== STUDY MATERIAL ===
+{request.material_text[:50000]}
+"""
+
     try:
-        print("Calling Groq API...")
+        print("Calling Groq API for paper generation...")
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            temperature=0.4,
+            max_tokens=8000,
         )
         print("Generation Successful!")
         return completion.choices[0].message.content
+
     except Exception as e:
-        print(f"!!! GENERATION ERROR !!!: {str(e)}")
-        # If it's a context length issue, try with a smaller chunk as fallback
-        if any(msg in str(e).lower() for msg in ["rate_limit", "context_length", "limit_reached"]):
-            print("Fallback to smaller context...")
-            # Get the base prompt without the study material
-            base_prompt = prompt.split("### STUDY MATERIAL:")[0]
-            prompt_fallback = f"{base_prompt}### STUDY MATERIAL:\n{request.material_text[:20000]}"
+        print(f"!!! GENERATION ERROR: {str(e)}")
+
+        error_str = str(e).lower()
+        if any(msg in error_str for msg in ["rate_limit", "context_length", "limit_reached", "too large"]):
+            print("Retrying with smaller context (20,000 chars)...")
+            base_prompt = prompt.split("=== STUDY MATERIAL ===")[0]
+            prompt_fallback = f"{base_prompt}=== STUDY MATERIAL ===\n{request.material_text[:20000]}"
             try:
                 completion = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[{"role": "user", "content": prompt_fallback}],
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
+                    temperature=0.4,
+                    max_tokens=8000,
                 )
                 return completion.choices[0].message.content
             except Exception as e2:
-                raise HTTPException(status_code=500, detail=f"Generation failed after fallback: {str(e2)}")
-        
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Generation failed after fallback: {str(e2)}",
+                )
+
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ---------------------------------------------------------------------------
+# ENDPOINT 3: Evaluate a student's solved paper from images
+# ROOT CAUSE FIX: Changed from Form() to JSON body (EvaluationRequest model)
+#   - URLSearchParams + List[str] = Form() was the cause of the 500 error
+#   - FastAPI parses JSON body natively and reliably
+# FIX: base64-encode images — Groq Vision can't reliably fetch Cloudinary URLs
+# FIX: pass per-question marks to the AI so scoring is accurate, not guessed
+# ---------------------------------------------------------------------------
 @app.post("/evaluate-submission")
-async def evaluate_submission(
-    image_urls: List[str] = Form(...),
-    paper_json: str = Form(...)
-):
-    # This will handle multi-image OCR and evaluation using Llama 3 Vision
-    # paper_json contains the original questions and answers
-    
+async def evaluate_submission(request: EvaluationRequest):
+    # Parse questions
+    try:
+        questions = json.loads(request.paper_json)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid paper_json — must be valid JSON")
+
+    if not isinstance(questions, list) or len(questions) == 0:
+        raise HTTPException(status_code=400, detail="paper_json must be a non-empty array of questions")
+
+    # Build a mark-aware question summary for the prompt
+    question_summary = ""
+    total_max_marks = 0
+    for i, q in enumerate(questions):
+        qtype = q.get("questionType", "theory")
+        marks = q.get("marks", 0)
+        total_max_marks += marks
+        question_summary += (
+            f"\nQ{i + 1} [{qtype.upper()}] (Max Marks: {marks})\n"
+            f"  Question : {q.get('questionText', '')}\n"
+            f"  Correct  : {q.get('correctAnswer', '')}\n"
+        )
+
     prompt = f"""
-    You are an expert examiner. Above are images of a student's handwritten solved paper.
-    Original Paper Structure:
-    {paper_json}
-    
-    Evaluate the student's answers based on the images provided.
-    For each question:
-    1. Extract the student's answer using OCR.
-    2. Compare it with the correct answer.
-    3. Assign marks based on accuracy.
-    4. Provide constructive feedback and show the correct answer if their answer is wrong.
-    
-    Return a JSON object:
-    {{
-        "totalScore": 25,
-        "maxScore": 50,
-        "feedback": [
-            {{
-                "questionIndex": 0,
-                "obtainedMarks": 5,
-                "aiFeedback": "Excellent explanation.",
-                "isCorrect": true,
-                "correctAnswer": "..."
-            }}
-        ],
-        "overallComment": "Well done!"
-    }}
-    """
-    
-    # In a real implementation, we would iterate over image_urls and send to Vision model
-    # For now, I'll provide the structured logic for Groq Vision
-    
-    content = [{"type": "text", "text": prompt}]
-    for url in image_urls:
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": url}
-        })
+You are a strict but fair university examiner evaluating a student's handwritten solved paper.
+
+=== ORIGINAL PAPER QUESTIONS AND CORRECT ANSWERS ===
+{question_summary}
+
+Total Maximum Marks: {total_max_marks}
+
+=== YOUR EVALUATION TASK ===
+The images provided are scanned pages of the student's handwritten answers.
+
+For EACH question (Q1, Q2, ... in order):
+1. OCR: Read the student's handwritten answer from the image carefully.
+2. Compare: Compare their answer against the correct answer provided above.
+3. Score:
+   - For MCQ: Full marks if correct, 0 if wrong. No partial marks.
+   - For Theory: Award partial marks proportionally:
+       * Correct definition or opening: 25 percent of marks
+       * Correct mechanism or working: 35 percent of marks
+       * Relevant example: 20 percent of marks
+       * Conclusion or completeness: 20 percent of marks
+4. Feedback: Write 2 to 3 sentences of constructive feedback.
+5. Always include the correctAnswer field for every question.
+
+=== REQUIRED JSON OUTPUT ===
+Return only a valid JSON object in this exact format:
+{{
+    "totalScore": 0,
+    "maxScore": {total_max_marks},
+    "feedback": [
+        {{
+            "questionIndex": 0,
+            "studentAnswer": "what the student wrote",
+            "obtainedMarks": 0,
+            "aiFeedback": "2-3 sentence constructive feedback here.",
+            "isCorrect": false,
+            "correctAnswer": "full correct answer here"
+        }}
+    ],
+    "overallComment": "2-3 sentence overall performance summary."
+}}
+Note: totalScore must equal the sum of all obtainedMarks values.
+Note: no obtainedMarks value may exceed the question's Max Marks.
+"""
+
+    # Download images and encode as base64 — Groq Vision cannot fetch Cloudinary URLs
+    content: list = [{"type": "text", "text": prompt}]
+    async with httpx.AsyncClient(timeout=60.0) as http_client:
+        for url in request.image_urls:
+            try:
+                img_response = await http_client.get(url)
+                img_response.raise_for_status()
+                encoded = base64.b64encode(img_response.content).decode("utf-8")
+                # Strip charset params from content-type (e.g. "image/jpeg; charset=utf-8")
+                content_type = img_response.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{content_type};base64,{encoded}"},
+                    }
+                )
+                print(f"Loaded image successfully: {url[:80]}...")
+            except Exception as img_err:
+                print(f"WARNING: Could not load image {url}: {img_err}")
+
+    if len(content) == 1:
+        # Only the text prompt, zero images loaded
+        raise HTTPException(
+            status_code=422,
+            detail="No images could be loaded from the provided URLs. Check that the URLs are publicly accessible."
+        )
 
     try:
+        print(f"Calling Groq Vision with {len(content) - 1} image(s)...")
         completion = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": content}],
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=4000,
         )
+        print("Evaluation Successful!")
         return completion.choices[0].message.content
     except Exception as e:
+        print(f"!!! EVALUATION ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# ENDPOINT 4: Evaluate directly from uploaded question paper + answer sheet
+# No saved paper in DB needed — user uploads BOTH at evaluation time.
+# Step 1: OCR the question paper to extract questions and marks.
+# Step 2: Re-use those extracted questions to evaluate the answer sheet.
+# ---------------------------------------------------------------------------
+@app.post("/evaluate-raw")
+async def evaluate_raw(request: RawEvaluationRequest):
+    if not request.question_paper_urls:
+        raise HTTPException(status_code=400, detail="question_paper_urls is required")
+    if not request.answer_sheet_urls:
+        raise HTTPException(status_code=400, detail="answer_sheet_urls is required")
+
+    print(f"--- RAW EVALUATION START ---")
+    print(f"Question Paper pages: {len(request.question_paper_urls)}")
+    print(f"Answer Sheet pages  : {len(request.answer_sheet_urls)}")
+
+    # -----------------------------------------------------------------------
+    # STEP 1: Download + base64-encode the question paper images
+    # -----------------------------------------------------------------------
+    async def download_as_base64(urls: List[str], http_client: httpx.AsyncClient):
+        """Download a list of image URLs and return base64 data URIs."""
+        result = []
+        for url in urls:
+            try:
+                r = await http_client.get(url)
+                r.raise_for_status()
+                encoded = base64.b64encode(r.content).decode("utf-8")
+                ctype = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+                result.append({"data_uri": f"data:{ctype};base64,{encoded}", "url": url})
+                print(f"  Loaded: {url[:70]}...")
+            except Exception as e:
+                print(f"  WARNING: Could not load {url}: {e}")
+        return result
+
+    async with httpx.AsyncClient(timeout=60.0) as http:
+        print("Downloading question paper images...")
+        qp_images = await download_as_base64(request.question_paper_urls, http)
+        print("Downloading answer sheet images...")
+        ans_images = await download_as_base64(request.answer_sheet_urls, http)
+
+    if not qp_images:
+        raise HTTPException(status_code=422, detail="No question paper images could be loaded")
+    if not ans_images:
+        raise HTTPException(status_code=422, detail="No answer sheet images could be loaded")
+
+    # -----------------------------------------------------------------------
+    # STEP 2: OCR the question paper → extract structured questions
+    # -----------------------------------------------------------------------
+    qp_extraction_prompt = f"""
+You are an expert OCR system. The images provided are pages of a printed question paper.
+
+Your task:
+1. Read every question carefully.
+2. Extract each question with its question number, type (MCQ or Theory/Subjective), and marks.
+3. For MCQ: include all options (A, B, C, D).
+4. For Theory: just the question text is enough.
+5. Total marks of the paper: {request.total_marks}
+
+Return ONLY a valid JSON object:
+{{
+    "questions": [
+        {{
+            "questionNumber": 1,
+            "questionText": "full question text here",
+            "questionType": "mcq or theory",
+            "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+            "marks": 5
+        }}
+    ]
+}}
+
+Rules:
+- If marks are not printed on the paper, distribute {request.total_marks} total marks equally.
+- questionType must be exactly "mcq" or "theory".
+- options array is empty [] for theory questions.
+"""
+
+    qp_content = [{"type": "text", "text": qp_extraction_prompt}]
+    for img in qp_images:
+        qp_content.append({"type": "image_url", "image_url": {"url": img["data_uri"]}})
+
+    try:
+        print("Step 1: Extracting questions from question paper via Vision OCR...")
+        qp_completion = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[{"role": "user", "content": qp_content}],
+            response_format={"type": "json_object"},
+            temperature=0.1,   # Very low — we want exact extraction, not creativity
+            max_tokens=4000,
+        )
+        extracted_raw = qp_completion.choices[0].message.content
+        extracted = json.loads(extracted_raw)
+        questions = extracted.get("questions", [])
+        print(f"  Extracted {len(questions)} question(s) from question paper.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Question paper extraction failed: {str(e)}")
+
+    if not questions:
+        raise HTTPException(
+            status_code=422,
+            detail="Could not extract any questions from the question paper. Make sure the image is clear and readable."
+        )
+
+    # -----------------------------------------------------------------------
+    # STEP 3: Evaluate the answer sheet against the extracted questions
+    # -----------------------------------------------------------------------
+    total_max_marks = sum(q.get("marks", 0) for q in questions)
+    # If all marks are 0 (couldn't extract), distribute equally
+    if total_max_marks == 0:
+        per_q = round(request.total_marks / len(questions))
+        for q in questions:
+            q["marks"] = per_q
+        total_max_marks = request.total_marks
+
+    question_summary = ""
+    for i, q in enumerate(questions):
+        qtype = q.get("questionType", "theory")
+        marks = q.get("marks", 0)
+        opts = "\n    ".join(q.get("options", []))
+        question_summary += (
+            f"\nQ{i + 1} [{qtype.upper()}] (Max Marks: {marks})\n"
+            f"  Question: {q.get('questionText', '')}\n"
+        )
+        if opts:
+            question_summary += f"  Options:\n    {opts}\n"
+
+    eval_prompt = f"""
+You are a strict but fair university examiner evaluating a student's handwritten answer sheet.
+
+=== QUESTION PAPER (already extracted) ===
+{question_summary}
+
+Total Maximum Marks: {total_max_marks}
+
+=== YOUR TASK ===
+The images provided are the student's handwritten answer sheet pages.
+
+For EACH question in order:
+1. OCR: Read the student's handwritten answer from the image.
+2. Compare their answer against what is being asked.
+3. Score:
+   - MCQ: Full marks if correct, 0 if wrong.
+   - Theory: Partial marks based on:
+       * Definition / opening: 25 percent
+       * Mechanism / working: 35 percent
+       * Example: 20 percent
+       * Conclusion / completeness: 20 percent
+4. Write 2-3 sentences of constructive feedback.
+5. For MCQ: state which option was correct. For Theory: provide a brief model answer.
+
+=== REQUIRED JSON OUTPUT ===
+{{
+    "totalScore": 0,
+    "maxScore": {total_max_marks},
+    "feedback": [
+        {{
+            "questionIndex": 0,
+            "studentAnswer": "what the student wrote",
+            "obtainedMarks": 0,
+            "aiFeedback": "2-3 sentence feedback.",
+            "isCorrect": false,
+            "correctAnswer": "correct answer or model answer here"
+        }}
+    ],
+    "overallComment": "2-3 sentence overall performance summary."
+}}
+Note: totalScore must equal the sum of all obtainedMarks. No obtainedMarks may exceed its question Max Marks.
+"""
+
+    ans_content = [{"type": "text", "text": eval_prompt}]
+    for img in ans_images:
+        ans_content.append({"type": "image_url", "image_url": {"url": img["data_uri"]}})
+
+    try:
+        print("Step 2: Evaluating answer sheet against extracted questions...")
+        eval_completion = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[{"role": "user", "content": ans_content}],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=4000,
+        )
+        eval_result_raw = eval_completion.choices[0].message.content
+        eval_result = json.loads(eval_result_raw)
+        print("Raw Evaluation Successful!")
+
+        # Return both the extracted questions AND the evaluation result
+        return {
+            "extractedQuestions": questions,
+            "evaluation": eval_result,
+            "totalMaxMarks": total_max_marks
+        }
+    except Exception as e:
+        print(f"!!! RAW EVALUATION ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Answer evaluation failed: {str(e)}")
+

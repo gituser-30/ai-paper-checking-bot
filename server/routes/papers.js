@@ -9,6 +9,10 @@ router.post('/generate', async (req, res) => {
     const { userId, materialIds, materialText, config } = req.body;
     
     try {
+        if (!process.env.AI_SERVICE_URL) {
+            throw new Error('AI_SERVICE_URL is not defined in environment variables');
+        }
+
         const aiResponse = await axios.post(`${process.env.AI_SERVICE_URL}/generate-paper`, {
             material_text: materialText,
             pattern: config.pattern,
@@ -64,7 +68,7 @@ router.get('/:id', async (req, res) => {
 
 // @route   PATCH api/papers/:id
 // @desc    Update marks for questions in a paper
-router.post('/:id', async (req, res) => {
+router.patch('/:id', async (req, res) => {
     try {
         const { questions } = req.body;
         const paper = await Paper.findByIdAndUpdate(

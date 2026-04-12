@@ -28,6 +28,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     // Call AI Service to extract text
     let extractedText = '';
     try {
+      if (!process.env.AI_SERVICE_URL) {
+        throw new Error('AI_SERVICE_URL is not defined in environment variables');
+      }
+
       const aiResponse = await axios.post(`${process.env.AI_SERVICE_URL}/extract-text-url`, {
         file_url: req.file.path,
         file_type: req.file.mimetype.includes('pdf') ? 'pdf' : 'image'

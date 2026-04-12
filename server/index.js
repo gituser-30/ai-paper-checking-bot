@@ -1,4 +1,16 @@
 require('dotenv').config();
+
+// Validate Environment Variables
+const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET', 'AI_SERVICE_URL', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
+const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+if (missingVars.length > 0) {
+  console.error('CRITICAL ERROR: Missing environment variables:', missingVars.join(', '));
+  console.error('Please check your .env file or Render dashboard settings.');
+  // We don't exit(1) to allow the server to potentially run for other features, 
+  // but specific routes will fail gracefully.
+} else {
+  console.log('Environment variables loaded successfully.');
+}
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
