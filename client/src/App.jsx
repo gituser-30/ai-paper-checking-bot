@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import ThreeBackground from './components/ThreeBackground';
 import { useTheme } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
