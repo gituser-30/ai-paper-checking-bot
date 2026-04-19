@@ -33,7 +33,11 @@ app.use((req, res, next) => {
 // Serve static files from the React client app
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
+// Import Rate Limiters
+const { globalLimiter } = require('./middleware/rateLimiter');
+
 // API Routes
+app.use('/api', globalLimiter); // Apply globally to all API routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/materials', require('./routes/materials'));
 app.use('/api/papers', require('./routes/papers'));

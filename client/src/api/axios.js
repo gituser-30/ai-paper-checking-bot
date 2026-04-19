@@ -13,4 +13,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Add response interceptor for global rate limit handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 429) {
+      alert('Too Many Requests: You have reached the rate limit. Please try again later.');
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

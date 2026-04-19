@@ -3,12 +3,13 @@ const router = express.Router();
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { authLimiter } = require('../middleware/rateLimiter');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // @route   POST api/auth/google
 // @desc    Verify Google Token and Login/Register User
-router.post('/google', async (req, res) => {
+router.post('/google', authLimiter, async (req, res) => {
   const { idToken } = req.body;
 
   try {

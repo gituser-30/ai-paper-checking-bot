@@ -7,14 +7,20 @@ import base64
 import pdfplumber
 from typing import List
 from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import groq
 from dotenv import load_dotenv
 
 load_dotenv()
 
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -108,9 +114,10 @@ def read_root():
 # FIX: Batch OCR in groups of 5 pages (Groq Vision API limit)
 # ---------------------------------------------------------------------------
 @app.post("/extract-text-url")
-async def extract_text_url(request: dict):
-    file_url = request.get("file_url")
-    file_type = request.get("file_type")
+@limiter.limit("5/minute")
+async def extract_text_url(request: Request, body: dict):
+    file_url = body.get("file_url")
+    file_type = body.get("file_type")
 
     if not file_url:
         raise HTTPException(status_code=400, detail="file_url is required")
@@ -243,12 +250,13 @@ async def extract_text_url(request: dict):
 # FIX: MCQ options use A)/B)/C)/D) labels, correctAnswer = full option text
 # ---------------------------------------------------------------------------
 @app.post("/generate-paper")
-async def generate_paper(request: PaperGenerationRequest):
+@limiter.limit("5/minute")
+async def generate_paper(request: Request, body: PaperGenerationRequest):
     print(f"--- GENERATION START ---")
-    print(f"Material Length: {len(request.material_text)} chars")
+    print(f"Material Length: {len(body.material_text)} chars")
     print(
-        f"Config: {request.mcq_count} MCQs, {request.theory_count} Theory, "
-        f"Difficulty: {request.difficulty}, Total Marks: {request.total_marks}"
+        f"Config: {body.mcq_count} MCQs, {body.theory_count} Theory, "
+        f"Difficulty: {body.difficulty}, Total Marks: {body.total_marks}"
     )
 
     prompt = f"""
@@ -310,7 +318,7 @@ Return ONLY a valid JSON object in this exact format:
 }}
 
 === STUDY MATERIAL ===
-{request.material_text[:14000]}
+{body.material_text[:14000]}
 """
 
     try:
@@ -332,7 +340,7 @@ Return ONLY a valid JSON object in this exact format:
         if any(msg in error_str for msg in ["rate_limit", "context_length", "limit_reached", "too large", "413", "429"]):
             print("Retrying with smaller context (15,000 chars) and fallback model...")
             base_prompt = prompt.split("=== STUDY MATERIAL ===")[0]
-            prompt_fallback = f"{base_prompt}=== STUDY MATERIAL ===\n{request.material_text[:15000]}"
+            prompt_fallback = f"{base_prompt}=== STUDY MATERIAL ===\n{body.material_text[:15000]}"
             try:
                 completion = await create_chat_completion_with_retry(
                     model="llama-3.1-8b-instant",
@@ -364,10 +372,11 @@ Return ONLY a valid JSON object in this exact format:
 # FIX: pass per-question marks to the AI so scoring is accurate, not guessed
 # ---------------------------------------------------------------------------
 @app.post("/evaluate-submission")
-async def evaluate_submission(request: EvaluationRequest):
+@limiter.limit("5/minute")
+async def evaluate_submission(request: Request, body: EvaluationRequest):
     # Parse questions
     try:
-        questions = json.loads(request.paper_json)
+        questions = json.loads(body.paper_json)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid paper_json — must be valid JSON")
 
@@ -435,7 +444,7 @@ Note: no obtainedMarks value may exceed the question's Max Marks.
     # Download images and encode as base64 — Groq Vision cannot fetch Cloudinary URLs
     content: list = [{"type": "text", "text": prompt}]
     async with httpx.AsyncClient(timeout=60.0) as http_client:
-        for url in request.image_urls:
+        for url in body.image_urls:
             try:
                 img_response = await http_client.get(url)
                 img_response.raise_for_status()
@@ -482,15 +491,16 @@ Note: no obtainedMarks value may exceed the question's Max Marks.
 # Step 2: Re-use those extracted questions to evaluate the answer sheet.
 # ---------------------------------------------------------------------------
 @app.post("/evaluate-raw")
-async def evaluate_raw(request: RawEvaluationRequest):
-    if not request.question_paper_urls:
+@limiter.limit("5/minute")
+async def evaluate_raw(request: Request, body: RawEvaluationRequest):
+    if not body.question_paper_urls:
         raise HTTPException(status_code=400, detail="question_paper_urls is required")
-    if not request.answer_sheet_urls:
+    if not body.answer_sheet_urls:
         raise HTTPException(status_code=400, detail="answer_sheet_urls is required")
 
     print(f"--- RAW EVALUATION START ---")
-    print(f"Question Paper pages: {len(request.question_paper_urls)}")
-    print(f"Answer Sheet pages  : {len(request.answer_sheet_urls)}")
+    print(f"Question Paper pages: {len(body.question_paper_urls)}")
+    print(f"Answer Sheet pages  : {len(body.answer_sheet_urls)}")
 
     # -----------------------------------------------------------------------
     # STEP 1: Download + base64-encode the question paper images
@@ -512,9 +522,9 @@ async def evaluate_raw(request: RawEvaluationRequest):
 
     async with httpx.AsyncClient(timeout=60.0) as http:
         print("Downloading question paper images...")
-        qp_images = await download_as_base64(request.question_paper_urls, http)
+        qp_images = await download_as_base64(body.question_paper_urls, http)
         print("Downloading answer sheet images...")
-        ans_images = await download_as_base64(request.answer_sheet_urls, http)
+        ans_images = await download_as_base64(body.answer_sheet_urls, http)
 
     if not qp_images:
         raise HTTPException(status_code=422, detail="No question paper images could be loaded")
@@ -531,7 +541,7 @@ Your task:
 1. Read every question carefully.
 2. Extract each question with its question number, type (MCQ or Theory/Subjective), and marks.
 3. For Theory: just the question text is enough.
-4. Total marks of the paper: {request.total_marks}
+4. Total marks of the paper: {body.total_marks}
 Return ONLY a valid JSON object:
 {{
     "questions": [
@@ -545,7 +555,7 @@ Return ONLY a valid JSON object:
 }}
 
 Rules:
-- If marks are not printed on the paper, distribute {request.total_marks} total marks equally.
+- If marks are not printed on the paper, distribute {body.total_marks} total marks equally.
 - questionType must be exactly "mcq" or "theory".
 - options array is empty [] for theory questions.
 """
@@ -582,10 +592,10 @@ Rules:
     total_max_marks = sum(q.get("marks", 0) for q in questions)
     # If all marks are 0 (couldn't extract), distribute equally
     if total_max_marks == 0:
-        per_q = round(request.total_marks / len(questions))
+        per_q = round(body.total_marks / len(questions))
         for q in questions:
             q["marks"] = per_q
-        total_max_marks = request.total_marks
+        total_max_marks = body.total_marks
 
     question_summary = ""
     for i, q in enumerate(questions):

@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const Paper = require('../models/Paper');
 const axios = require('axios');
+const { aiLimiter } = require('../middleware/rateLimiter');
 
 // @route   POST api/papers/generate
 // @desc    Generate a new question paper from material
-router.post('/generate', async (req, res) => {
+router.post('/generate', aiLimiter, async (req, res) => {
     const { userId, materialIds, materialText, config } = req.body;
     
     try {

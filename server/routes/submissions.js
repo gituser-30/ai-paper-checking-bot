@@ -6,6 +6,7 @@ const axios = require('axios');
 const Paper = require('../models/Paper');
 const Submission = require('../models/Submission');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { aiLimiter } = require('../middleware/rateLimiter');
 
 // Setup Multer for multiple images
 const storage = new CloudinaryStorage({
@@ -20,7 +21,7 @@ const upload = multer({ storage: storage });
 
 // @route   POST api/submissions/evaluate
 // @desc    Upload solved paper images and get AI evaluation
-router.post('/evaluate', upload.array('solvedPages', 5), async (req, res) => {
+router.post('/evaluate', aiLimiter, upload.array('solvedPages', 5), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ msg: 'No files uploaded' });
 
@@ -83,7 +84,7 @@ router.get('/user/:userId', async (req, res) => {
 // @route   POST api/submissions/evaluate-raw
 // @desc    Upload BOTH question paper and answer sheet — no saved paper needed in DB
 //          AI reads the question paper, extracts questions, then evaluates the answers
-router.post('/evaluate-raw', upload.fields([
+router.post('/evaluate-raw', aiLimiter, upload.fields([
     { name: 'questionPaperPages', maxCount: 10 },   // question paper images
     { name: 'solvedPages', maxCount: 10 }            // answer sheet images
 ]), async (req, res) => {
