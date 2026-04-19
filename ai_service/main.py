@@ -265,15 +265,15 @@ Your task is to generate a high-quality, academically rigorous question paper
 based ONLY on the core educational content provided below.
 
 === PAPER SPECIFICATIONS ===
-- Difficulty Level : {request.difficulty}
-- Total Target Marks: {request.total_marks}
-- MCQ Questions     : {request.mcq_count}
-- Theory Questions  : {request.theory_count}
+- Difficulty Level : {body.difficulty}
+- Total Target Marks: {body.total_marks}
+- MCQ Questions     : {body.mcq_count}
+- Theory Questions  : {body.theory_count}
 
 === STRICT RULES ===
 1. IGNORE non-educational content: acknowledgments, prefaces, author bios, index pages, forewords.
 2. FOCUS on chapters, technical concepts, definitions, mechanisms, algorithms, and examples.
-3. Generate EXACTLY {request.mcq_count} MCQ questions and EXACTLY {request.theory_count} theory questions.
+3. Generate EXACTLY {body.mcq_count} MCQ questions and EXACTLY {body.theory_count} theory questions.
 4. Set all "marks" fields to 0 (marks will be assigned manually later).
 
 === DIFFICULTY GUIDELINES ===
