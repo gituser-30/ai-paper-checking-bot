@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import ThreeBackground from './components/ThreeBackground';
 import { useTheme } from './context/ThemeContext';
@@ -17,13 +17,16 @@ import Checker from './pages/Checker';
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const [isNavOpen, setIsNavOpen] = useState(false);
+
+  const closeNav = () => setIsNavOpen(false);
 
   return (
     <nav className="navbar navbar-expand-lg glass-navbar px-4 py-2 sticky-top">
       <div className="container-fluid">
 
         {/* Logo */}
-        <Link className="navbar-brand fw-bold fs-3 gradient-text" to="/">
+        <Link className="navbar-brand fw-bold fs-3 gradient-text" to="/" onClick={closeNav}>
           EvalyzeAI
         </Link>
 
@@ -31,14 +34,13 @@ const Navbar = () => {
         <button
           className="navbar-toggler border-0"
           type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarNav"
+          onClick={() => setIsNavOpen(!isNavOpen)}
         >
           <span className="navbar-toggler-icon"></span>
         </button>
 
         {/* Menu */}
-        <div className="collapse navbar-collapse" id="navbarNav">
+        <div className={`collapse navbar-collapse ${isNavOpen ? 'show' : ''}`} id="navbarNav">
           <ul className="navbar-nav ms-auto align-items-center gap-2">
 
             {user ? (
@@ -51,7 +53,7 @@ const Navbar = () => {
                   { to: "/history", label: "History", icon: <HistoryIcon size={18} /> },
                 ].map((item, index) => (
                   <li key={index} className="nav-item">
-                    <Link className="nav-link nav-hover" to={item.to}>
+                    <Link className="nav-link nav-hover" to={item.to} onClick={closeNav}>
                       {item.icon}
                       <span className="ms-2">{item.label}</span>
                     </Link>
