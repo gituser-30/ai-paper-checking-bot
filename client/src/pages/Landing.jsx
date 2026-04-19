@@ -22,17 +22,26 @@ const Landing = () => {
     hidden: { opacity: 0 },
     visible: { 
       opacity: 1,
-      transition: { staggerChildren: 0.2, delayChildren: 0.3 }
+      transition: { staggerChildren: 0.15, delayChildren: 0.2 }
     }
   };
 
   const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1, transition: { duration: 0.8, ease: [0.25, 1, 0.5, 1] } }
+    hidden: { y: 30, opacity: 0 },
+    visible: { y: 0, opacity: 1, transition: { duration: 0.7, ease: [0.25, 1, 0.5, 1] } }
   };
 
   return (
-    <div className="container min-vh-100 d-flex flex-column justify-content-center py-5">
+    <div className="container min-vh-100 d-flex flex-column justify-content-center py-5 position-relative z-10">
+      
+      {/* Decorative Floating Cosmic Elements */}
+      <motion.div className="position-absolute d-none d-lg-block" style={{ top: '10%', right: '5%', zIndex: -1 }} animate={{ rotate: 360, y: [-20, 20, -20] }} transition={{ repeat: Infinity, duration: 20, ease: "linear" }}>
+         <div className="rounded-circle" style={{ width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(138,43,226,0.15) 0%, transparent 70%)', filter: 'blur(40px)' }}/>
+      </motion.div>
+      <motion.div className="position-absolute d-none d-lg-block" style={{ bottom: '10%', left: '10%', zIndex: -1 }} animate={{ y: [0, -30, 0] }} transition={{ repeat: Infinity, duration: 15, ease: "easeInOut" }}>
+         <div className="rounded-circle" style={{ width: '250px', height: '250px', background: 'radial-gradient(circle, rgba(0,240,255,0.1) 0%, transparent 70%)', filter: 'blur(50px)' }}/>
+      </motion.div>
+
       <motion.div 
         className="row align-items-center"
         variants={containerVariants}
@@ -40,43 +49,43 @@ const Landing = () => {
         animate="visible"
       >
         <div className="col-lg-7 mb-5 mb-lg-0">
-          <motion.div variants={itemVariants} className="badge bg-glass text-primary px-3 py-2 rounded-pill mb-4 border border-primary-glow d-inline-flex align-items-center gap-2">
-            <Zap size={14} /> <span>v2.0 is now live with Llama 4 Scout</span>
+          <motion.div variants={itemVariants} className="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-4" style={{ background: 'rgba(0, 240, 255, 0.1)', border: '1px solid rgba(0, 240, 255, 0.3)', boxShadow: '0 0 15px rgba(0, 240, 255, 0.2)' }}>
+            <Zap size={16} className="text-info" />
+            <span className="text-white small fw-bold text-uppercase tracking-wider">v3.0 Cosmic Engine Live</span>
           </motion.div>
           
-          <motion.h1 variants={itemVariants} className="display-1 fw-extrabold mb-4 lh-tight">
-            The Future of <br />
-            <span className="gradient-text">Academic AI</span>
+          <motion.h1 variants={itemVariants} className="cosmic-title mb-4 lh-1">
+            Master The <br />
+            <span className="gradient-text">Academic Galaxy</span>
           </motion.h1>
           
-          <motion.p variants={itemVariants} className="fs-4 mb-5 text-secondary pe-lg-5 fw-medium">
-            EvalyzeAI transforms how educators generate exams and evaluate handwritten submissions. 
-            Automate your workflow with 99% accuracy.
+          <motion.p variants={itemVariants} className="fs-5 mb-5 text-secondary pe-lg-5 fw-light lh-lg" style={{ maxWidth: '600px' }}>
+            Elevate your teaching workflow with interstellar AI precision. Automatically generate exams and evaluate hand-written sheets across the cosmos in seconds.
           </motion.p>
           
           <motion.div variants={itemVariants} className="d-flex flex-wrap gap-4 align-items-center">
-            <div className="d-inline-block p-1 bg-white rounded-4 shadow-lg hover-scale transition-all">
+            <div className="d-inline-block p-1 rounded-4 position-relative z-20" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
               <GoogleLogin
                 onSuccess={handleSuccess}
                 onError={() => console.log('Login Failed')}
-                theme="filled_blue"
+                theme="filled_black"
                 shape="pill"
               />
             </div>
             
-            <button className="btn btn-link text-white text-decoration-none fw-bold d-flex align-items-center gap-2 hover-slide">
-              See how it works <ArrowRight size={20} />
+            <button className="btn text-white fw-bold d-flex align-items-center gap-2 border-0" style={{ background: 'transparent' }} onMouseOver={(e) => e.currentTarget.style.textShadow = '0 0 15px #00f0ff'} onMouseOut={(e) => e.currentTarget.style.textShadow = 'none'}>
+              Explore Platform <ArrowRight size={20} />
             </button>
           </motion.div>
           
-          <motion.div variants={itemVariants} className="mt-5 pt-4 d-flex gap-5 opacity-50">
-            <div className="d-flex align-items-center gap-2">
-              <span className="fs-3 fw-bold">10k+</span>
-              <span className="small text-uppercase tracking-wider">Papers<br/>Generated</span>
+          <motion.div variants={itemVariants} className="mt-5 pt-4 d-flex gap-5 border-top border-secondary border-opacity-25" style={{ maxWidth: '500px' }}>
+            <div className="d-flex flex-column gap-1">
+               <span className="fs-2 fw-bold text-white text-shadow-glow">1M+</span>
+               <span className="small text-uppercase text-secondary" style={{letterSpacing: '1px'}}>Sheets Evaluated</span>
             </div>
-            <div className="d-flex align-items-center gap-2">
-              <span className="fs-3 fw-bold">99.8%</span>
-              <span className="small text-uppercase tracking-wider">OCR<br/>Accuracy</span>
+            <div className="d-flex flex-column gap-1">
+               <span className="fs-2 fw-bold text-white text-shadow-glow">99.9%</span>
+               <span className="small text-uppercase text-secondary" style={{letterSpacing: '1px'}}>AI Accuracy</span>
             </div>
           </motion.div>
         </div>
@@ -87,51 +96,54 @@ const Landing = () => {
             variants={containerVariants}
           >
             <FeatureCard 
-              icon={<Cpu className="text-primary" size={32} />}
-              title="Parallel Generation"
-              desc="Build high-quality MCQ & Theory papers from 60+ page documents in seconds."
+              icon={<Cpu className="text-white" size={28} />}
+              title="Quantum Generation"
+              desc="Process massive documents to synthesize high-quality theory papers."
               delay={0.1}
+              color="#00f0ff"
             />
             <FeatureCard 
-              icon={<ShieldCheck className="text-secondary" size={32} />}
-              title="Verified Vision OCR"
-              desc="Our Llama 4 engine reads handwriting that traditional OCR systems fail to decode."
+              icon={<ShieldCheck className="text-white" size={28} />}
+              title="Cosmic Vision OCR"
+              desc="The smartest vision models decode human handwriting seamlessly."
               delay={0.2}
+              color="#ff007f"
             />
             <FeatureCard 
-              icon={<MousePointer2 className="text-accent" size={32} />}
-              title="One-Click Evaluation"
-              desc="Upload your answer key and student sheets. Get sub-totaled results instantly."
+              icon={<MousePointer2 className="text-white" size={28} />}
+              title="One-Click Gravity"
+              desc="Drop your response sheets. Let our engine calculate the rest automatically."
               delay={0.3}
+              color="#8a2be2"
             />
             <FeatureCard 
-              icon={<Zap className="text-warning" size={32} />}
-              title="Feedback Loop"
-              desc="AI provides personalized comments for students based on their handwriting."
+              icon={<Zap className="text-white" size={28} />}
+              title="Nebula Feedback"
+              desc="Students receive hyper-personalized feedback based on granular assessment."
               delay={0.4}
+              color="#ffaa00"
             />
           </motion.div>
         </div>
       </motion.div>
-      
-      {/* Background Decorative Element */}
-      <div className="noise-bg" />
     </div>
   );
 };
 
-const FeatureCard = ({ icon, title, desc, delay }) => (
+const FeatureCard = ({ icon, title, desc, delay, color }) => (
   <motion.div 
-    className="col-md-6"
-    initial={{ scale: 0.9, opacity: 0 }}
-    animate={{ scale: 1, opacity: 1 }}
-    transition={{ delay, duration: 0.5 }}
-    whileHover={{ y: -10, transition: { duration: 0.2 } }}
+    className="col-md-12 col-xl-6"
+    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+    animate={{ scale: 1, opacity: 1, y: 0 }}
+    transition={{ delay, duration: 0.5, type: "spring", stiffness: 100 }}
+    whileHover={{ y: -5, scale: 1.02 }}
   >
-    <div className="glass-card p-4 h-100 shimmer border-primary-glow">
-      <div className="mb-3 p-3 bg-glass rounded-3 d-inline-block">{icon}</div>
-      <h5 className="fw-bold mb-2">{title}</h5>
-      <p className="text-secondary small mb-0 lh-base">{desc}</p>
+    <div className="glass-card p-4 h-100" style={{ borderLeft: `3px solid ${color}` }}>
+      <div className="mb-4 d-inline-flex align-items-center justify-content-center rounded-circle" style={{ width: '50px', height: '50px', background: `linear-gradient(135deg, ${color}40, ${color}10)`, boxShadow: `0 0 20px ${color}40` }}>
+         {icon}
+      </div>
+      <h5 className="fw-bold mb-2 text-white" style={{ letterSpacing: '0.5px' }}>{title}</h5>
+      <p className="text-secondary small mb-0 lh-lg">{desc}</p>
     </div>
   </motion.div>
 );

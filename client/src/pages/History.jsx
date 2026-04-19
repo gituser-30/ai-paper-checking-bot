@@ -54,7 +54,7 @@ const History = () => {
             animate="visible"
         >
             <motion.div variants={itemVariants} className="mb-5">
-                <h1 className="fw-900 gradient-text mb-2">Paper Archive</h1>
+                <h1 className="fw-900 cosmic-title mb-2" style={{ fontSize: '3rem' }}>Paper Archive</h1>
                 <p className="text-secondary fw-medium opacity-80">Track and manage your generated history with industrial-grade AI synthesis.</p>
             </motion.div>
 
@@ -70,7 +70,7 @@ const History = () => {
                     </div>
                     <h3 className="fw-900 mb-2">No Records Detected</h3>
                     <p className="text-secondary mb-4 fs-5 opacity-70">Your academic archive is currently pristine. Create your first exam to begin.</p>
-                    <button onClick={() => navigate('/generate')} className="btn btn-primary-gradient px-5 py-3 rounded-4 fw-bold text-uppercase tracking-widest">
+                    <button onClick={() => navigate('/generate')} className="glow-btn px-5 py-3">
                         Generate New Paper
                     </button>
                 </motion.div>
@@ -114,12 +114,12 @@ const History = () => {
                                         <div className="d-flex gap-2">
                                             <button
                                                 onClick={() => navigate(`/generate?id=${paper._id}`)}
-                                                className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-black text-uppercase small tracking-widest d-flex align-items-center justify-content-center gap-2 group"
+                                                className="glow-btn w-100 py-3 d-flex align-items-center justify-content-center gap-2 group"
                                             >
                                                 View Artifact <ChevronRight size={16} className="group-hover-translate-x" />
                                             </button>
                                             <button onClick={() => handleDelete(paper._id)}
-                                                className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-black text-uppercase small tracking-widest d-flex align-items-center justify-content-center gap-2 group">
+                                                className="glow-btn btn-secondary-glow w-100 py-3 d-flex align-items-center justify-content-center gap-2">
                                                 delete <Trash2 size={16} /></button>
                                         </div>
                                     </div>

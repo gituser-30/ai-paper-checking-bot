@@ -147,7 +147,7 @@ const Generate = () => {
       {/* Progress Header */}
       <div className="d-flex align-items-center justify-content-between mb-5 no-print">
         <div>
-          <h1 className="fw-extrabold gradient-text mb-1">Paper Workshop</h1>
+          <h1 className="fw-extrabold cosmic-title mb-1" style={{ fontSize: '3rem' }}>Paper Workshop</h1>
           <p className="text-secondary small fw-bold text-uppercase tracking-widest">
             {step === 'CONFIG' ? 'Step 1: Configuration' : step === 'MARKING' ? 'Step 2: Marking Scheme' : 'Step 3: Export & Print'}
           </p>
@@ -245,11 +245,11 @@ const Generate = () => {
             <div className="row g-4 mb-4">
               <div className="col-md-6">
                 <label className="form-label text-secondary small fw-bold uppercase">MCQ Quantity</label>
-                <input type="number" className="form-control" value={config.mcqCount} onChange={e => setConfig({ ...config, mcqCount: e.target.value })} />
+                <input type="number" className="cosmic-input" value={config.mcqCount} onChange={e => setConfig({ ...config, mcqCount: e.target.value })} />
               </div>
               <div className="col-md-6">
                 <label className="form-label text-secondary small fw-bold uppercase">Theory Quantity</label>
-                <input type="number" className="form-control" value={config.theoryCount} onChange={e => setConfig({ ...config, theoryCount: e.target.value })} />
+                <input type="number" className="cosmic-input" value={config.theoryCount} onChange={e => setConfig({ ...config, theoryCount: e.target.value })} />
               </div>
             </div>
 
@@ -264,7 +264,7 @@ const Generate = () => {
             <button 
               disabled={loading || selectedMaterials.length === 0} 
               onClick={handleGenerate} 
-              className="btn btn-primary-gradient w-100 py-3 rounded-4 text-uppercase tracking-widest fw-bold"
+              className="glow-btn w-100 py-3 mt-4"
             >
               <Sparkles size={20} className="me-2" /> Start AI Generation
             </button>
@@ -305,7 +305,7 @@ const Generate = () => {
                   <div style={{ width: '90px' }}>
                     <input
                       type="number"
-                      className="form-control text-center py-2 fw-bold"
+                      className="cosmic-input text-center py-2 fw-bold"
                       placeholder="Marks"
                       value={q.marks || ''}
                       onChange={(e) => {
@@ -320,8 +320,8 @@ const Generate = () => {
             </div>
 
             <div className="d-flex gap-3 mt-5">
-              <button className="btn btn-glass px-4" onClick={() => setStep('CONFIG')}>Back</button>
-              <button onClick={finalizePaper} className="btn btn-primary-gradient flex-grow-1 py-3 rounded-4 fw-bold text-uppercase tracking-wider">
+              <button className="btn glow-btn btn-secondary-glow px-4" onClick={() => setStep('CONFIG')}>Back</button>
+              <button onClick={finalizePaper} className="glow-btn flex-grow-1 py-3">
                 <CheckCircle size={20} className="me-2" /> Finalize Exam Paper
               </button>
             </div>

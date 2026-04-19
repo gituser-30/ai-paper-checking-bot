@@ -74,7 +74,7 @@ const Materials = () => {
       animate="visible"
     >
       <motion.div variants={itemVariants} className="mb-5">
-        <h1 className="fw-900 gradient-text mb-2">Knowledge Library</h1>
+        <h1 className="fw-900 cosmic-title mb-2">Knowledge Library</h1>
         <p className="text-secondary fw-medium opacity-80">Upload source materials to train EvalyzeAI on your specific curriculum.</p>
       </motion.div>
       
@@ -89,7 +89,7 @@ const Materials = () => {
                 <label className="form-label text-secondary small text-uppercase fw-black letter-spacing-1 mb-2">Internal Title</label>
                 <input 
                   type="text" 
-                  className="form-control" 
+                  className="cosmic-input" 
                   value={title} 
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Quantum Physics Ch.1"
@@ -121,7 +121,7 @@ const Materials = () => {
                   </label>
                 </div>
               </div>
-              <button disabled={uploading || !file} className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-bold text-uppercase small tracking-widest">
+              <button disabled={uploading || !file} className="glow-btn w-100 py-3 mt-4">
                 {uploading ? <Loader2 size={20} className="animate-spin me-2" /> : 'Process Assets'}
               </button>
             </form>

@@ -120,13 +120,13 @@ const Checker = () => {
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-5 no-print">
         <div>
-          <h1 className="fw-extrabold gradient-text mb-1">Handwritten Checker</h1>
+          <h1 className="fw-extrabold cosmic-title mb-1" style={{ fontSize: '3rem' }}>Handwritten Checker</h1>
           <p className="text-secondary small fw-bold text-uppercase tracking-widest">
             Vision OCR based Grading Engine
           </p>
         </div>
         {evaluation && (
-          <button onClick={() => window.print()} className="btn btn-primary-gradient px-4 py-2 rounded-4 fw-bold">
+          <button onClick={() => window.print()} className="glow-btn px-4 py-2">
             <Printer size={18} className="me-2" /> Export Report
           </button>
         )}
@@ -181,7 +181,7 @@ const Checker = () => {
                          </label>
                        </div>
                     </div>
-                    <button disabled={!selectedPaper || answerFiles.length === 0} className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-bold">Evaluate Submission</button>
+                    <button disabled={!selectedPaper || answerFiles.length === 0} className="glow-btn w-100 py-3 mt-4">Evaluate Submission</button>
                   </form>
                 ) : (
                   <form onSubmit={handleEvaluateRaw}>
@@ -211,7 +211,7 @@ const Checker = () => {
                          </label>
                        </div>
                     </div>
-                    <button disabled={qpFiles.length === 0 || answerFiles.length === 0} className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-bold">Analyze & Grade Everything</button>
+                    <button disabled={qpFiles.length === 0 || answerFiles.length === 0} className="glow-btn w-100 py-3 mt-4">Analyze & Grade Everything</button>
                     <p className="text-center text-secondary x-small mt-3 opacity-60">Uses Vision-to-Critique logic (Approx 90s)</p>
                   </form>
                 )}

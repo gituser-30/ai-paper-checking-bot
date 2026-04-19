@@ -52,9 +52,9 @@ const Dashboard = () => {
   };
 
   const cards = [
-    { title: 'Total Papers', value: stats.papers, icon: FileText, color: 'text-primary' },
-    { title: 'Study Materials', value: stats.materials, icon: BookOpen, color: 'text-accent' },
-    { title: 'AI Evaluated', value: stats.submissions, icon: CheckCircle, color: 'text-secondary' },
+    { title: 'Total Papers', value: stats.papers, icon: FileText, color: 'primary' },
+    { title: 'Study Materials', value: stats.materials, icon: BookOpen, color: 'accent' },
+    { title: 'AI Evaluated', value: stats.submissions, icon: CheckCircle, color: 'secondary' },
   ];
 
   const quickActions = [
@@ -78,7 +78,7 @@ const Dashboard = () => {
               EvalyzeAI Workspace v2.0
             </span>
           </div>
-          <h1 className="fw-extrabold mb-1 display-5">
+          <h1 className="fw-extrabold mb-1 display-5 cosmic-title" style={{ fontSize: '3rem' }}>
             Welcome back, <span className="gradient-text">{user?.name?.split(' ')[0]}</span>
           </h1>
           <p className="text-secondary mb-0 fs-5 opacity-75 fw-medium">
@@ -90,9 +90,9 @@ const Dashboard = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => navigate('/generate')}
-            className="btn btn-primary-gradient px-4 py-3 rounded-4 fw-bold d-inline-flex align-items-center gap-2"
+            className="glow-btn btn-lg d-inline-flex align-items-center gap-2"
           >
-            <Plus size={20} /> Create New Exam
+            <Plus size={20} /> CREATOR HUB
           </motion.button>
         </div>
       </motion.div>
@@ -102,11 +102,11 @@ const Dashboard = () => {
         {cards.map((card, i) => (
           <motion.div key={i} className="col-md-4" variants={itemVariants}>
             <div className="glass-card p-4 d-flex align-items-center">
-              <div className={`p-3 bg-glass rounded-4 me-4 ${card.color} border border-glass shadow-sm`}>
+              <div className={`p-3 rounded-4 me-4 border neon-border shadow-sm text-${card.color}`} style={{ background: `var(--bg-glass)`, borderColor: `var(--${card.color})` }}>
                 <card.icon size={28} />
               </div>
               <div>
-                <p className="text-secondary small fw-bold text-uppercase tracking-widest mb-1">{card.title}</p>
+                <p className={`small fw-bold text-uppercase tracking-widest mb-1 text-${card.color}`}>{card.title}</p>
                 <h2 className="fw-extrabold mb-0 display-6">
                   {loading ? '...' : card.value}
                 </h2>
@@ -129,8 +129,8 @@ const Dashboard = () => {
                   onClick={() => navigate(action.path)}
                   className="glass-card p-4 cursor-pointer hover-bg-glass-heavy shimmer group transition-all h-100"
                 >
-                  <div className={`p-3 bg-${action.color} bg-opacity-10 text-${action.color} rounded-3 mb-3 d-inline-block`}>
-                    <action.icon size={22} />
+                  <div className={`p-3 rounded-3 mb-3 d-inline-block shadow`} style={{ background: `rgba(var(--${action.color}), 0.1)`, padding: '10px', boxShadow: `0 0 10px var(--${action.color}-glow)` }}>
+                    <action.icon size={22} className={`text-${action.color}`} />
                   </div>
                   <h6 className="fw-bold mb-1 d-flex align-items-center justify-content-between">
                     {action.title} <ArrowRight size={16} className="opacity-0 group-hover-opacity-50 transition-all" />
@@ -215,9 +215,9 @@ const Dashboard = () => {
 
             <button
               onClick={() => navigate('/check')}
-              className="btn btn-glass w-100 mt-4 rounded-4 py-3 fw-bold text-uppercase small tracking-widest"
+              className="glow-btn w-100 mt-4 py-3"
             >
-              Go to Checker
+              Start Grading Platform
             </button>
           </motion.div>
         </div>
