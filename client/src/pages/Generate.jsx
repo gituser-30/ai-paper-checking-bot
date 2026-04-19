@@ -59,14 +59,11 @@ const Generate = () => {
     if (selectedMaterials.length === 0) return;
     setLoading(true);
 
-    const selectedData = materials.filter(m => selectedMaterials.includes(m._id));
-    const combinedText = selectedData.map(m => m.extractedText).join("\n\n---\n\n");
-
     try {
+      // Server fetches extractedText from DB using materialIds — no need to send text from client
       const res = await api.post('/papers/generate', {
         userId: user._id,
         materialIds: selectedMaterials,
-        materialText: combinedText,
         config
       });
       setPaper(res.data);
