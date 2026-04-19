@@ -25,20 +25,39 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
     const { userId, title } = req.body;
 
-    // Call AI Service to extract text
+    // Call AI Service to extract text (with retry for Groq rate limits)
     let extractedText = '';
     try {
       if (!process.env.AI_SERVICE_URL) {
         throw new Error('AI_SERVICE_URL is not defined in environment variables');
       }
 
-      const aiResponse = await axios.post(`${process.env.AI_SERVICE_URL}/extract-text-url`, {
-        file_url: req.file.path,
-        file_type: req.file.mimetype.includes('pdf') ? 'pdf' : 'image'
-      });
-      extractedText = aiResponse.data.text;
+      const MAX_RETRIES = 3;
+      let lastErr = null;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const aiResponse = await axios.post(`${process.env.AI_SERVICE_URL}/extract-text-url`, {
+            file_url: req.file.path,
+            file_type: req.file.mimetype.includes('pdf') ? 'pdf' : 'image'
+          }, { timeout: 120000 });
+          extractedText = aiResponse.data.text;
+          lastErr = null;
+          break; // Success — exit retry loop
+        } catch (retryErr) {
+          lastErr = retryErr;
+          const status = retryErr.response?.status;
+          if (status === 429 && attempt < MAX_RETRIES) {
+            const delay = Math.pow(2, attempt) * 2000; // 4s, 8s
+            console.warn(`AI extraction 429 rate-limited. Retrying in ${delay / 1000}s (attempt ${attempt}/${MAX_RETRIES})...`);
+            await new Promise(r => setTimeout(r, delay));
+          } else {
+            throw retryErr; // Non-retryable or final attempt
+          }
+        }
+      }
+      if (lastErr) throw lastErr;
     } catch (aiErr) {
-      console.error('AI Extraction Error:', aiErr.message);
+      console.error('AI Extraction Error:', aiErr.response?.data || aiErr.message);
       // We still save the material even if AI extraction fails, for manual viewing
     }
 

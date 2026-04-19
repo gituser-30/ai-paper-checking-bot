@@ -114,7 +114,7 @@ def read_root():
 # FIX: Batch OCR in groups of 5 pages (Groq Vision API limit)
 # ---------------------------------------------------------------------------
 @app.post("/extract-text-url")
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 async def extract_text_url(request: Request, body: dict):
     file_url = body.get("file_url")
     file_type = body.get("file_type")
@@ -250,7 +250,7 @@ async def extract_text_url(request: Request, body: dict):
 # FIX: MCQ options use A)/B)/C)/D) labels, correctAnswer = full option text
 # ---------------------------------------------------------------------------
 @app.post("/generate-paper")
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 async def generate_paper(request: Request, body: PaperGenerationRequest):
     print(f"--- GENERATION START ---")
     print(f"Material Length: {len(body.material_text)} chars")
@@ -372,7 +372,7 @@ Return ONLY a valid JSON object in this exact format:
 # FIX: pass per-question marks to the AI so scoring is accurate, not guessed
 # ---------------------------------------------------------------------------
 @app.post("/evaluate-submission")
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 async def evaluate_submission(request: Request, body: EvaluationRequest):
     # Parse questions
     try:
@@ -491,7 +491,7 @@ Note: no obtainedMarks value may exceed the question's Max Marks.
 # Step 2: Re-use those extracted questions to evaluate the answer sheet.
 # ---------------------------------------------------------------------------
 @app.post("/evaluate-raw")
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 async def evaluate_raw(request: Request, body: RawEvaluationRequest):
     if not body.question_paper_urls:
         raise HTTPException(status_code=400, detail="question_paper_urls is required")
