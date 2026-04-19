@@ -20,6 +20,10 @@ const connectDB = require('./config/db');
 
 const app = express();
 
+// Trust reverse proxy (e.g., Render, Heroku) so rate limiter accurately captures user IPs
+// instead of blocking the proxy IP
+app.set('trust proxy', 1);
+
 // Connect Database
 connectDB();
 
