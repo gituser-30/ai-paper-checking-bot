@@ -24,11 +24,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import time
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     print("WARNING: GROQ_API_KEY not found in environment variables!")
 
 client = groq.Groq(api_key=GROQ_API_KEY)
+
+def create_chat_completion_with_retry(*args, **kwargs):
+    max_retries = 5
+    delay = 2.0
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            return client.chat.completions.create(*args, **kwargs)
+        except groq.RateLimitError as e:
+            last_error = e
+            print(f"RateLimitError caught: {e}. Retrying in {delay} seconds (Attempt {attempt + 1}/{max_retries})...")
+            time.sleep(delay)
+            delay *= 2
+        except Exception as e:
+            # Check for other errors carrying a 429 status implicitly via string
+            if "429" in str(e) or "rate limit" in str(e).lower():
+                last_error = e
+                print(f"429/Rate Limit error caught: {e}. Retrying in {delay} seconds (Attempt {attempt + 1}/{max_retries})...")
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise e
+    print(f"Failed after {max_retries} attempts due to rate limit constraints.")
+    if last_error:
+        raise last_error
+    raise Exception("Rate limit exceeded")
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +182,7 @@ async def extract_text_url(request: dict):
                     loop = asyncio.get_event_loop()
                     res = await loop.run_in_executor(
                         None, 
-                        lambda: client.chat.completions.create(
+                        lambda: create_chat_completion_with_retry(
                             model="meta-llama/llama-4-scout-17b-16e-instruct",
                             messages=[{"role": "user", "content": content_list}],
                         )
@@ -178,7 +206,7 @@ async def extract_text_url(request: dict):
         else:
             # Image file: Vision OCR directly
             encoded_image = base64.b64encode(content).decode("utf-8")
-            res = client.chat.completions.create(
+            res = create_chat_completion_with_retry(
                 model="meta-llama/llama-4-scout-17b-16e-instruct",
                 messages=[
                     {
@@ -291,7 +319,7 @@ Return ONLY a valid JSON object in this exact format:
 
     try:
         print("Calling Groq API for paper generation...")
-        completion = client.chat.completions.create(
+        completion = create_chat_completion_with_retry(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
@@ -310,7 +338,7 @@ Return ONLY a valid JSON object in this exact format:
             base_prompt = prompt.split("=== STUDY MATERIAL ===")[0]
             prompt_fallback = f"{base_prompt}=== STUDY MATERIAL ===\n{request.material_text[:15000]}"
             try:
-                completion = client.chat.completions.create(
+                completion = create_chat_completion_with_retry(
                     model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": prompt_fallback}],
                     response_format={"type": "json_object"},
@@ -437,7 +465,7 @@ Note: no obtainedMarks value may exceed the question's Max Marks.
 
     try:
         print(f"Calling Groq Vision with {len(content) - 1} image(s)...")
-        completion = client.chat.completions.create(
+        completion = create_chat_completion_with_retry(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": content}],
             response_format={"type": "json_object"},
@@ -532,7 +560,7 @@ Rules:
 
     try:
         print("Step 1: Extracting questions from question paper via Vision OCR...")
-        qp_completion = client.chat.completions.create(
+        qp_completion = create_chat_completion_with_retry(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": qp_content}],
             response_format={"type": "json_object"},
@@ -624,7 +652,7 @@ Note: totalScore must equal the sum of all obtainedMarks. No obtainedMarks may e
 
     try:
         print("Step 2: Evaluating answer sheet against extracted questions...")
-        eval_completion = client.chat.completions.create(
+        eval_completion = create_chat_completion_with_retry(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": ans_content}],
             response_format={"type": "json_object"},
