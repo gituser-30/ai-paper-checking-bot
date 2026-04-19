@@ -78,22 +78,44 @@ const Generate = () => {
     }
   };
 
+  // const finalizePaper = async () => {
+  //   const sum = paper.questions.reduce((acc, q) => acc + (q.marks || 0), 0);
+  //   if (sum !== parseInt(config.totalMarks)) {
+  //     alert(`The sum of marks (${sum}) must equal the total marks (${config.totalMarks})!`);
+  //     return;
+  //   }
+  //   setLoading(true);
+  //   try {
+  //     await api.post(`/papers/${paper._id}`, { questions: paper.questions });
+  //     setStep('FINAL');
+  //   } catch (err) {
+  //     alert('Failed to finalize paper');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+
   const finalizePaper = async () => {
-    const sum = paper.questions.reduce((acc, q) => acc + (q.marks || 0), 0);
-    if (sum !== parseInt(config.totalMarks)) {
-      alert(`The sum of marks (${sum}) must equal the total marks (${config.totalMarks})!`);
-      return;
-    }
-    setLoading(true);
-    try {
-      await api.post(`/papers/${paper._id}`, { questions: paper.questions });
-      setStep('FINAL');
-    } catch (err) {
-      alert('Failed to finalize paper');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const sum = paper.questions.reduce((acc, q) => acc + (q.marks || 0), 0);
+
+  if (sum !== parseInt(config.totalMarks)) {
+    alert(`The sum of marks (${sum}) must equal the total marks (${config.totalMarks})!`);
+    return;
+  }
+
+  setLoading(true);
+  try {
+    await api.patch(`/papers/${paper._id}`, {   // ✅ FIXED
+      questions: paper.questions
+    });
+    setStep('FINAL');
+  } catch (err) {
+    alert('Failed to finalize paper');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const variants = {
     initial: { opacity: 0, x: 20 },
@@ -104,6 +126,11 @@ const Generate = () => {
   const isLargeDocument = materials
     .filter(m => selectedMaterials.includes(m._id))
     .some(m => m.extractedText?.length > 40000);
+  
+
+  const handlePrint = () => {
+  window.print();
+};
 
   return (
     <div className="container mt-4 pb-5">

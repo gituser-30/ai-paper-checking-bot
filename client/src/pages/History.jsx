@@ -47,7 +47,7 @@ const History = () => {
     };
 
     return (
-        <motion.div 
+        <motion.div
             className="container mt-4 pb-5"
             variants={containerVariants}
             initial="hidden"
@@ -78,8 +78,8 @@ const History = () => {
                 <div className="row g-4">
                     <AnimatePresence>
                         {papers.map((paper, i) => (
-                            <motion.div 
-                                key={paper._id} 
+                            <motion.div
+                                key={paper._id}
                                 className="col-md-6 col-lg-4"
                                 variants={itemVariants}
                                 exit={{ opacity: 0, scale: 0.9 }}
@@ -90,8 +90,8 @@ const History = () => {
                                         <div className="p-3 bg-primary bg-opacity-10 text-primary rounded-4">
                                             <Zap size={24} />
                                         </div>
-                                        <button 
-                                            onClick={() => handleDelete(paper._id)} 
+                                        <button
+                                            onClick={() => handleDelete(paper._id)}
                                             className="btn btn-glass p-2 rounded-circle hover-danger opacity-0 group-hover-opacity-100 transition-all"
                                         >
                                             <Trash2 size={16} />
@@ -111,12 +111,17 @@ const History = () => {
                                             <span className="badge bg-glass text-primary border border-primary border-opacity-20 px-2 py-1 uppercase">{paper.config?.totalMarks || 0} Marks</span>
                                             <span className="badge bg-glass text-secondary border border-glass px-2 py-1 uppercase">{paper.questions?.length || 0} Items</span>
                                         </div>
-                                        <button 
-                                            onClick={() => navigate(`/generate?id=${paper._id}`)} 
-                                            className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-black text-uppercase small tracking-widest d-flex align-items-center justify-content-center gap-2 group"
-                                        >
-                                            View Artifact <ChevronRight size={16} className="group-hover-translate-x" />
-                                        </button>
+                                        <div className="d-flex gap-2">
+                                            <button
+                                                onClick={() => navigate(`/generate?id=${paper._id}`)}
+                                                className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-black text-uppercase small tracking-widest d-flex align-items-center justify-content-center gap-2 group"
+                                            >
+                                                View Artifact <ChevronRight size={16} className="group-hover-translate-x" />
+                                            </button>
+                                            <button onClick={() => handleDelete(paper._id)}
+                                                className="btn btn-primary-gradient w-100 py-3 rounded-4 fw-black text-uppercase small tracking-widest d-flex align-items-center justify-content-center gap-2 group">
+                                                delete <Trash2 size={16} /></button>
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>
@@ -124,7 +129,7 @@ const History = () => {
                     </AnimatePresence>
                 </div>
             )}
-            
+
             <div className="noise-bg opacity-10" />
         </motion.div>
     );

@@ -155,7 +155,7 @@ async def extract_text_url(request: dict):
                     res = await loop.run_in_executor(
                         None, 
                         lambda: client.chat.completions.create(
-                            model="llama-3.2-90b-vision-preview",
+                            model="meta-llama/llama-4-scout-17b-16e-instruct",
                             messages=[{"role": "user", "content": content_list}],
                         )
                     )
@@ -169,6 +169,7 @@ async def extract_text_url(request: dict):
                     try:
                         res_text = await process_ocr_batch(batch_slice, batch_start)
                         results.append(res_text)
+                        await asyncio.sleep(2)
                     except Exception as e:
                         print(f"Batch OCR skipped due to limit: {e}")
 
@@ -178,7 +179,7 @@ async def extract_text_url(request: dict):
             # Image file: Vision OCR directly
             encoded_image = base64.b64encode(content).decode("utf-8")
             res = client.chat.completions.create(
-                model="llama-3.2-90b-vision-preview",
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
                 messages=[
                     {
                         "role": "user",
@@ -205,6 +206,9 @@ async def extract_text_url(request: dict):
 
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"Failed to download file: {str(e)}")
+    except groq.RateLimitError as e:
+        # FastAPI might not natively map this, so explicitly return a 429
+        raise HTTPException(status_code=429, detail=f"AI service token/rate limit exceeded: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -282,7 +286,7 @@ Return ONLY a valid JSON object in this exact format:
 }}
 
 === STUDY MATERIAL ===
-{request.material_text[:22000]}
+{request.material_text[:14000]}
 """
 
     try:
@@ -292,7 +296,7 @@ Return ONLY a valid JSON object in this exact format:
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0.4,
-            max_tokens=8000,
+            max_tokens=2500,
         )
         print("Generation Successful!")
         return completion.choices[0].message.content
@@ -301,24 +305,28 @@ Return ONLY a valid JSON object in this exact format:
         print(f"!!! GENERATION ERROR: {str(e)}")
 
         error_str = str(e).lower()
-        if any(msg in error_str for msg in ["rate_limit", "context_length", "limit_reached", "too large"]):
-            print("Retrying with smaller context (20,000 chars)...")
+        if any(msg in error_str for msg in ["rate_limit", "context_length", "limit_reached", "too large", "413", "429"]):
+            print("Retrying with smaller context (15,000 chars) and fallback model...")
             base_prompt = prompt.split("=== STUDY MATERIAL ===")[0]
-            prompt_fallback = f"{base_prompt}=== STUDY MATERIAL ===\n{request.material_text[:20000]}"
+            prompt_fallback = f"{base_prompt}=== STUDY MATERIAL ===\n{request.material_text[:15000]}"
             try:
                 completion = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": prompt_fallback}],
                     response_format={"type": "json_object"},
                     temperature=0.4,
-                    max_tokens=8000,
+                    max_tokens=2500,
                 )
                 return completion.choices[0].message.content
             except Exception as e2:
+                print(f"!!! FALLBACK ERROR: {str(e2)}")
                 raise HTTPException(
                     status_code=500,
                     detail=f"Generation failed after fallback: {str(e2)}",
                 )
+
+        if isinstance(e, groq.RateLimitError):
+            raise HTTPException(status_code=429, detail=str(e))
 
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -368,7 +376,7 @@ The images provided are scanned pages of the student's handwritten answers.
 
 For EACH question (Q1, Q2, ... in order):
 1. OCR: Read the student's handwritten answer from the image carefully.
-2. Compare: Compare their answer against the correct answer provided above.
+2. Compare: Compare their answer against the correct answer provided above. if user has written something different in their own wording but the meaning is same as the correct answer or it is an another valid way to express the same thing , or if user has written some extra ordinary which our pdf dont have the  carefully check it and give fair marks.
 3. Score:
    - For MCQ: Full marks if correct, 0 if wrong. No partial marks.
    - For Theory: Award partial marks proportionally:
@@ -430,7 +438,7 @@ Note: no obtainedMarks value may exceed the question's Max Marks.
     try:
         print(f"Calling Groq Vision with {len(content) - 1} image(s)...")
         completion = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": content}],
             response_format={"type": "json_object"},
             temperature=0.2,
@@ -498,10 +506,8 @@ You are an expert OCR system. The images provided are pages of a printed questio
 Your task:
 1. Read every question carefully.
 2. Extract each question with its question number, type (MCQ or Theory/Subjective), and marks.
-3. For MCQ: include all options (A, B, C, D).
-4. For Theory: just the question text is enough.
-5. Total marks of the paper: {request.total_marks}
-
+3. For Theory: just the question text is enough.
+4. Total marks of the paper: {request.total_marks}
 Return ONLY a valid JSON object:
 {{
     "questions": [
@@ -509,7 +515,6 @@ Return ONLY a valid JSON object:
             "questionNumber": 1,
             "questionText": "full question text here",
             "questionType": "mcq or theory",
-            "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
             "marks": 5
         }}
     ]
@@ -528,7 +533,7 @@ Rules:
     try:
         print("Step 1: Extracting questions from question paper via Vision OCR...")
         qp_completion = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": qp_content}],
             response_format={"type": "json_object"},
             temperature=0.1,   # Very low — we want exact extraction, not creativity
@@ -620,7 +625,7 @@ Note: totalScore must equal the sum of all obtainedMarks. No obtainedMarks may e
     try:
         print("Step 2: Evaluating answer sheet against extracted questions...")
         eval_completion = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": ans_content}],
             response_format={"type": "json_object"},
             temperature=0.2,

@@ -74,7 +74,7 @@ router.patch('/:id', async (req, res) => {
         const paper = await Paper.findByIdAndUpdate(
             req.params.id, 
             { $set: { questions } },
-            { new: true }
+            { returnDocument: 'after' }
         );
         res.json(paper);
     } catch (err) {
