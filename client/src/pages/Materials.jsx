@@ -40,7 +40,9 @@ const Materials = () => {
       setFile(null);
       fetchMaterials();
     } catch (err) {
-      alert('Upload failed. Ensure Cloudinary config is correct.');
+      const errMsg = err.response?.data?.error || err.response?.data?.msg || err.message;
+      console.error('Upload error details:', err.response?.data || err.message);
+      alert(`Upload failed: ${errMsg}`);
     } finally {
       setUploading(false);
     }

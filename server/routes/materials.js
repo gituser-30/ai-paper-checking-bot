@@ -73,8 +73,9 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     await newMaterial.save();
     res.json(newMaterial);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    console.error('Material upload error:', err.message);
+    console.error('Full error:', err);
+    res.status(500).json({ msg: 'Server Error', error: err.message });
   }
 });
 

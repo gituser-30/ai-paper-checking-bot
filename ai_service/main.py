@@ -282,7 +282,7 @@ based ONLY on the core educational content provided below.
 - Advance: Deep analysis, synthesis, case studies, architectural design questions.
 
 === MCQ FORMAT RULES ===
-- Every MCQ MUST have exactly 4 options labeled: "A) ...", "B) ...", "C) ...", "D) ..."
+
 - The "correctAnswer" field MUST be the FULL option string (e.g., "A) Binary Search Tree")
 - Options must be meaningfully distinct.
 
@@ -295,6 +295,7 @@ based ONLY on the core educational content provided below.
     d) Advantages or disadvantages where applicable
     e) A closing remark or conclusion
 - ONE-LINE ANSWERS ARE STRICTLY FORBIDDEN for theory questions.
+- Answer should be logically related to question.
 
 === REQUIRED JSON OUTPUT FORMAT ===
 Return ONLY a valid JSON object in this exact format:
