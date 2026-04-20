@@ -19,11 +19,22 @@ const upload = multer({ storage: storage });
 
 // @route   POST api/materials/upload
 // @desc    Upload study material and extract text
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', (req, res, next) => {
+  // Wrap multer in manual handler so Cloudinary upload errors are caught
+  upload.single('file')(req, res, (multerErr) => {
+    if (multerErr) {
+      console.error('Multer/Cloudinary upload error:', multerErr.message || multerErr);
+      return res.status(500).json({ msg: 'File upload failed', error: multerErr.message || 'Unknown upload error' });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
 
     const { userId, title } = req.body;
+
+    console.log('File uploaded to Cloudinary:', req.file.path);
 
     // Call AI Service to extract text (with retry for Groq rate limits)
     let extractedText = '';
@@ -74,7 +85,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     res.json(newMaterial);
   } catch (err) {
     console.error('Material upload error:', err.message);
-    console.error('Full error:', err);
+    console.error('Full error details:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     res.status(500).json({ msg: 'Server Error', error: err.message });
   }
 });
